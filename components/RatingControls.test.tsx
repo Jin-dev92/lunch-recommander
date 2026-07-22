@@ -8,9 +8,15 @@ import RatingControls from './RatingControls';
 
 const from = supabase.from as ReturnType<typeof vi.fn>;
 
-function mockRatings(existingScore: number | null | undefined = undefined) {
-  const upsert = vi.fn().mockResolvedValue({ data: null, error: null });
-  const maybeSingle = vi.fn().mockResolvedValue({ data: existingScore === undefined ? null : { score: existingScore }, error: null });
+function mockRatings(
+  existingScore: number | null | undefined = undefined,
+  options: { lookupError?: unknown; upsertError?: unknown } = {}
+) {
+  const upsert = vi.fn().mockResolvedValue({ data: null, error: options.upsertError ?? null });
+  const maybeSingle = vi.fn().mockResolvedValue({
+    data: options.lookupError ? null : existingScore === undefined ? null : { score: existingScore },
+    error: options.lookupError ?? null,
+  });
   const chain: { eq: ReturnType<typeof vi.fn>; maybeSingle: typeof maybeSingle } = { eq: vi.fn(), maybeSingle };
   chain.eq.mockReturnValue(chain);
   from.mockImplementation(() => ({ upsert, select: vi.fn().mockReturnValue(chain) }));
@@ -49,5 +55,30 @@ describe('평점 저장', () => {
     fireEvent.click(screen.getByRole('button', { name: '1주간 그만 보기' }));
     await vi.waitFor(() => expect(upsert).toHaveBeenCalled());
     expect(upsert.mock.calls[0][0].score).toBe(3);
+  });
+
+  it('기존 평점이 0점(영구 제외)이면 스누즈해도 0점을 유지합니다', async () => {
+    const { upsert } = mockRatings(0);
+    render(<RatingControls placeId="p1" userId="me" />);
+    fireEvent.click(screen.getByRole('button', { name: '1주간 그만 보기' }));
+    await vi.waitFor(() => expect(upsert).toHaveBeenCalled());
+    const call = upsert.mock.calls[0][0];
+    expect(call.score).toBe(0);
+    expect(call.snoozed_until).toBeTruthy();
+  });
+
+  it('점수 조회에 실패하면 upsert하지 않고 에러를 표시합니다', async () => {
+    const { upsert } = mockRatings(undefined, { lookupError: { message: 'db error' } });
+    render(<RatingControls placeId="p1" userId="me" />);
+    fireEvent.click(screen.getByRole('button', { name: '1주간 그만 보기' }));
+    await screen.findByRole('alert');
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('평점 저장에 실패하면 에러를 표시합니다', async () => {
+    mockRatings(undefined, { upsertError: { message: 'db error' } });
+    render(<RatingControls placeId="p1" userId="me" />);
+    fireEvent.click(screen.getByRole('button', { name: '3점' }));
+    await screen.findByRole('alert');
   });
 });
