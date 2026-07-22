@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Map from '../components/Map';
+import Recommend from '../components/Recommend';
 import { supabase } from '../lib/supabaseClient';
 
 type SearchLocation = { lat: number; lng: number; radius: 500 | 1000 };
@@ -28,6 +29,7 @@ export default function HomePage() {
           선택된 위치: {searchLocation.lat}, {searchLocation.lng} ({searchLocation.radius}m)
         </p>
       )}
+      <Recommend location={searchLocation} />
     </main>
   );
 }
