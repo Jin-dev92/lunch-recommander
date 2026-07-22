@@ -1,3 +1,37 @@
+'use client';
+import { useState } from 'react';
+import Link from 'next/link';
+import Map from '../components/Map';
+import Recommend from '../components/Recommend';
+import { supabase } from '../lib/supabaseClient';
+
+type SearchLocation = { lat: number; lng: number; radius: 500 | 1000 };
+
 export default function HomePage() {
-  return <main><h1>점심 추천</h1></main>;
+  const [error, setError] = useState('');
+  const [searchLocation, setSearchLocation] = useState<SearchLocation | null>(null);
+  async function logout() {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    document.cookie = 'sb-session=; path=/; max-age=0';
+    window.location.assign('/login');
+  }
+  return (
+    <main>
+      <h1>점심 추천</h1>
+      <Link href="/groups">그룹 관리</Link>
+      <button onClick={logout}>로그아웃</button>
+      {error && <p role="alert">{error}</p>}
+      <Map onLocationChange={setSearchLocation} />
+      {searchLocation && (
+        <p>
+          선택된 위치: {searchLocation.lat}, {searchLocation.lng} ({searchLocation.radius}m)
+        </p>
+      )}
+      <Recommend location={searchLocation} />
+    </main>
+  );
 }
