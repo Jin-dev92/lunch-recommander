@@ -34,4 +34,9 @@ describe('로그아웃', () => {
     expect(assign).not.toHaveBeenCalled();
     expect(document.cookie).toContain('sb-session=1');
   });
+
+  it('그룹 관리 화면으로 이동하는 링크를 보여줍니다', () => {
+    render(<HomePage />);
+    expect(screen.getByRole('link', { name: '그룹 관리' })).toHaveAttribute('href', '/groups');
+  });
 });

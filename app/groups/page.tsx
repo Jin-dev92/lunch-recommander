@@ -1,20 +1,23 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import Link from 'next/link';
 import { supabase } from '../../lib/supabaseClient';
 
 export default function GroupsPage() {
   const [invite, setInvite] = useState('');
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
   async function create(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const name = String(new FormData(e.currentTarget).get('name'));
     setInvite('');
     setMessage('');
-    const { data, error } = await supabase.rpc('create_group', { group_name: name });
-    if (error) {
-      setMessage(error.message);
+    setError('');
+    const { data, error: createError } = await supabase.rpc('create_group', { group_name: name });
+    if (createError) {
+      setError(createError.message);
     } else {
       setInvite(data[0].invite_code);
     }
@@ -24,12 +27,18 @@ export default function GroupsPage() {
     e.preventDefault();
     const code = String(new FormData(e.currentTarget).get('code')).trim();
     setMessage('');
-    const { error } = await supabase.rpc('join_group_by_code', { code });
-    setMessage(error ? error.message : '그룹에 가입했습니다.');
+    setError('');
+    const { error: joinError } = await supabase.rpc('join_group_by_code', { code });
+    if (joinError) {
+      setError(joinError.message);
+    } else {
+      setMessage('그룹에 가입했습니다.');
+    }
   }
 
   return (
     <main>
+      <Link href="/">추천 화면으로</Link>
       <form onSubmit={create}>
         <label>
           그룹 이름
@@ -46,6 +55,7 @@ export default function GroupsPage() {
         <button>그룹 가입</button>
       </form>
       {message && <p role="status">{message}</p>}
+      {error && <p role="alert">{error}</p>}
     </main>
   );
 }

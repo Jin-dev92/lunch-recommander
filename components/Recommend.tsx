@@ -13,6 +13,7 @@ export default function Recommend({ location }: { location: Location | null }) {
   const [result, setResult] = useState<Result | null>(null);
   const [userId, setUserId] = useState('');
   const [error, setError] = useState('');
+  const [categoryWeights, setCategoryWeights] = useState<Record<string, number>>({});
 
   async function run() {
     if (!location) return;
@@ -30,6 +31,7 @@ export default function Recommend({ location }: { location: Location | null }) {
     if (ratings.error) return setError(ratings.error.message);
     if (prefs.error) return setError(prefs.error.message);
     const merged = mergeCandidates(nearby.data.restaurants, ratings.data ?? [], prefs.data ?? [], user.id);
+    setCategoryWeights(merged.categoryWeights);
     // filterCandidates는 Task 4의 Candidate 타입으로 반환하므로 이름 필드를 다시 붙여둔다
     const filtered = filterCandidates(merged.candidates, new Date()) as (Candidate & { name:string })[];
     const candidates = filtered.map((candidate) => ({
@@ -49,7 +51,7 @@ export default function Recommend({ location }: { location: Location | null }) {
           <h2>{result.name}</h2>
           <p>{result.category} · {Math.round(result.distanceMeters)}m</p>
           <RatingControls placeId={result.placeId} userId={userId} />
-          <CategoryPrefs userId={userId} categories={[result.category]} />
+          <CategoryPrefs userId={userId} categories={[result.category]} currentWeights={categoryWeights} />
         </article>
       )}
       {error && <p role="alert">{error}</p>}

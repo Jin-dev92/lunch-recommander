@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import Map from '../components/Map';
 import Recommend from '../components/Recommend';
 import { supabase } from '../lib/supabaseClient';
@@ -21,6 +22,7 @@ export default function HomePage() {
   return (
     <main>
       <h1>점심 추천</h1>
+      <Link href="/groups">그룹 관리</Link>
       <button onClick={logout}>로그아웃</button>
       {error && <p role="alert">{error}</p>}
       <Map onLocationChange={setSearchLocation} />

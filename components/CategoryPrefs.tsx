@@ -2,7 +2,15 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
-export default function CategoryPrefs({ userId, categories }: { userId: string; categories: string[] }) {
+export default function CategoryPrefs({
+  userId,
+  categories,
+  currentWeights = {},
+}: {
+  userId: string;
+  categories: string[];
+  currentWeights?: Record<string, number>;
+}) {
   const [error, setError] = useState('');
 
   async function save(category: string, weight: number) {
@@ -23,7 +31,7 @@ export default function CategoryPrefs({ userId, categories }: { userId: string; 
             min="0.1"
             max="3"
             step="0.1"
-            defaultValue="1"
+            defaultValue={currentWeights[category] ?? 1}
             onBlur={(event) => save(category, Number(event.currentTarget.value))}
           />
         </label>
