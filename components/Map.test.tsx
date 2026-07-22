@@ -27,8 +27,18 @@ describe('지도', () => {
     const onLocationChange = vi.fn();
     render(<Map onLocationChange={onLocationChange} />);
     await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ lat: 37.5, lng: 127.0, radius: 500 }));
-    expect(mapMock).toHaveBeenCalled();
-    expect(markerMock).toHaveBeenCalled();
+    expect(mapMock).toHaveBeenCalledWith(expect.anything(), { center: { lat: 37.5, lng: 127.0 }, zoom: 16 });
+    expect(markerMock).toHaveBeenCalledWith({ position: { lat: 37.5, lng: 127.0 }, map: expect.anything() });
+  });
+
+  it('구글 지도 SDK가 로드되지 않았으면 에러 메시지를 보여주고 예외를 던지지 않습니다', async () => {
+    // SDK 로드 실패/차단 상황을 재현하기 위해 전역 google을 제거한다
+    delete (globalThis as unknown as { google?: typeof google }).google;
+    const getCurrentPosition = vi.fn((success) => success({ coords: { latitude: 37.5, longitude: 127.0 } }));
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
+    render(<Map onLocationChange={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('지도를 불러오지 못했습니다'));
+    expect(mapMock).not.toHaveBeenCalled();
   });
 
   it('위치 권한이 거부되면 에러 메시지를 보여줍니다', async () => {
@@ -46,5 +56,7 @@ describe('지도', () => {
     await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ lat: 37.5, lng: 127.0, radius: 500 }));
     fireEvent.change(screen.getByLabelText('검색 반경'), { target: { value: '1000' } });
     await waitFor(() => expect(onLocationChange).toHaveBeenCalledWith({ lat: 37.5, lng: 127.0, radius: 1000 }));
+    expect(getCurrentPosition).toHaveBeenCalledTimes(1);
+    expect(mapMock).toHaveBeenCalledTimes(1);
   });
 });
