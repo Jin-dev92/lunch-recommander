@@ -1,0 +1,14 @@
+# dependencies
+node_modules
+
+# next.js
+.next
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# env files (never commit real keys)
+.env
+.env.local
+supabase/.env
