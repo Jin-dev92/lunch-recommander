@@ -3,12 +3,15 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { filterCandidates, pickWeightedRandom, scoreCandidate, type Candidate } from '../lib/recommend';
 import { mergeCandidates } from '../lib/mergeCandidates';
+import RatingControls from './RatingControls';
+import CategoryPrefs from './CategoryPrefs';
 
 type Location = { lat:number; lng:number; radius:500|1000 };
 type Result = Candidate & { name:string; weight:number };
 
 export default function Recommend({ location }: { location: Location | null }) {
   const [result, setResult] = useState<Result | null>(null);
+  const [userId, setUserId] = useState('');
   const [error, setError] = useState('');
 
   async function run() {
@@ -17,6 +20,7 @@ export default function Recommend({ location }: { location: Location | null }) {
     setError('');
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return setError('로그인이 필요합니다.');
+    setUserId(user.id);
     const nearby = await supabase.functions.invoke('nearby', { body: location });
     if (nearby.error) return setError(nearby.error.message);
     const [ratings, prefs] = await Promise.all([
@@ -44,6 +48,8 @@ export default function Recommend({ location }: { location: Location | null }) {
         <article>
           <h2>{result.name}</h2>
           <p>{result.category} · {Math.round(result.distanceMeters)}m</p>
+          <RatingControls placeId={result.placeId} userId={userId} />
+          <CategoryPrefs userId={userId} categories={[result.category]} />
         </article>
       )}
       {error && <p role="alert">{error}</p>}
