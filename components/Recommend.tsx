@@ -13,6 +13,7 @@ export default function Recommend({ location }: { location: Location | null }) {
 
   async function run() {
     if (!location) return;
+    setResult(null);
     setError('');
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return setError('로그인이 필요합니다.');
@@ -22,6 +23,8 @@ export default function Recommend({ location }: { location: Location | null }) {
       supabase.from('ratings').select('user_id,place_id,score,snoozed_until'),
       supabase.from('category_prefs').select('category,weight'),
     ]);
+    if (ratings.error) return setError(ratings.error.message);
+    if (prefs.error) return setError(prefs.error.message);
     const merged = mergeCandidates(nearby.data.restaurants, ratings.data ?? [], prefs.data ?? [], user.id);
     // filterCandidates는 Task 4의 Candidate 타입으로 반환하므로 이름 필드를 다시 붙여둔다
     const filtered = filterCandidates(merged.candidates, new Date()) as (Candidate & { name:string })[];
