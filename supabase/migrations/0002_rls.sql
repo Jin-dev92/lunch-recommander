@@ -6,10 +6,16 @@ alter table public.ratings enable row level security;
 alter table public.category_prefs enable row level security;
 alter table public.api_usage enable row level security;
 
-grant select, insert, update, delete on
-  public.profiles, public.groups, public.group_members,
-  public.restaurants, public.ratings, public.category_prefs
-  to authenticated;
+-- grants are scoped to exactly what each table's RLS policies allow;
+-- groups/group_members have no authenticated INSERT because group creation
+-- and membership must go only through the create_group()/join_group_by_code()
+-- SECURITY DEFINER RPCs, never a direct client-side INSERT.
+grant select, insert, update on public.profiles to authenticated;
+grant select, update on public.groups to authenticated;
+grant select on public.group_members to authenticated;
+grant select on public.restaurants to authenticated;
+grant select, insert, update, delete on public.ratings to authenticated;
+grant select, insert, update, delete on public.category_prefs to authenticated;
 
 create function public.shares_group_with(other_user_id uuid)
 returns boolean language sql stable security definer set search_path = public as $$
@@ -31,7 +37,10 @@ using (id = auth.uid()) with check (id = auth.uid());
 create policy groups_select on public.groups for select to authenticated using (
   exists (select 1 from public.group_members gm where gm.group_id = id and gm.user_id = auth.uid())
 );
-create policy groups_insert on public.groups for insert to authenticated with check (created_by = auth.uid());
+-- no groups_insert policy: authenticated has no INSERT grant on groups, so
+-- direct client inserts are rejected at the grant level (42501) before RLS
+-- is even evaluated. create_group() is SECURITY DEFINER (owned by the table
+-- owner), so it can still insert the group + admin membership atomically.
 create policy groups_update on public.groups for update to authenticated using (
   exists (select 1 from public.group_members gm where gm.group_id = id and gm.user_id = auth.uid() and gm.role = 'admin')
 ) with check (created_by = auth.uid());

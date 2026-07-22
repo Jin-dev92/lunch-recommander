@@ -1,5 +1,5 @@
 begin;
-select plan(15);
+select plan(28);
 insert into auth.users(id) values
  ('00000000-0000-0000-0000-000000000001'),
  ('00000000-0000-0000-0000-000000000002'),
@@ -11,12 +11,38 @@ insert into public.ratings(user_id,place_id,score) values ('00000000-0000-0000-0
 create temporary table t_group(group_id uuid, invite_code text);
 grant select, insert on t_group to authenticated;
 
+-- SECURITY DEFINER RPCs must never be executable by PUBLIC or anon, only by
+-- authenticated. If this regresses, unauthenticated clients could probe
+-- RLS-protected data (group membership, ratings) through these functions.
+select function_privs_are('public', 'my_group_ids', array[]::name[], 'public', array[]::name[], 'my_group_ids: PUBLIC has no execute');
+select function_privs_are('public', 'my_group_ids', array[]::name[], 'anon', array[]::name[], 'my_group_ids: anon has no execute');
+select function_privs_are('public', 'my_group_ids', array[]::name[], 'authenticated', array['EXECUTE'], 'my_group_ids: authenticated can execute');
+
+select function_privs_are('public', 'shares_group_with', array['uuid'], 'public', array[]::name[], 'shares_group_with: PUBLIC has no execute');
+select function_privs_are('public', 'shares_group_with', array['uuid'], 'anon', array[]::name[], 'shares_group_with: anon has no execute');
+select function_privs_are('public', 'shares_group_with', array['uuid'], 'authenticated', array['EXECUTE'], 'shares_group_with: authenticated can execute');
+
+select function_privs_are('public', 'join_group_by_code', array['text'], 'public', array[]::name[], 'join_group_by_code: PUBLIC has no execute');
+select function_privs_are('public', 'join_group_by_code', array['text'], 'anon', array[]::name[], 'join_group_by_code: anon has no execute');
+select function_privs_are('public', 'join_group_by_code', array['text'], 'authenticated', array['EXECUTE'], 'join_group_by_code: authenticated can execute');
+
+select function_privs_are('public', 'create_group', array['text'], 'public', array[]::name[], 'create_group: PUBLIC has no execute');
+select function_privs_are('public', 'create_group', array['text'], 'anon', array[]::name[], 'create_group: anon has no execute');
+select function_privs_are('public', 'create_group', array['text'], 'authenticated', array['EXECUTE'], 'create_group: authenticated can execute');
+
 set local role authenticated;
 set local request.jwt.claim.sub = '00000000-0000-0000-0000-000000000001';
 select is((select count(*)::integer from public.ratings), 0, 'unshared rating hidden');
 select throws_ok(
   $$insert into public.group_members(group_id,user_id,role) values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000001','member')$$,
   '42501', null, 'direct membership insert denied'
+);
+-- groups must only ever be created via create_group() (atomically creates
+-- the group + admin membership); a direct client insert would produce an
+-- orphan group with no admin, so authenticated has no INSERT grant at all.
+select throws_ok(
+  $$insert into public.groups(name, invite_code, created_by) values ('우회그룹','BYPASSCODE01','00000000-0000-0000-0000-000000000001')$$,
+  '42501', null, 'direct group insert denied'
 );
 select has_function('public', 'join_group_by_code', array['text'], 'join RPC exists');
 select has_function('public', 'create_group', array['text'], 'create_group RPC exists');
