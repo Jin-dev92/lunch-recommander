@@ -40,4 +40,36 @@ describe('그룹',()=>{
     fireEvent.submit(screen.getByRole('button',{name:'그룹 가입'}).closest('form')!);
     await waitFor(()=>expect(screen.getByRole('status')).toHaveTextContent('유효하지 않은 초대코드입니다'));
   });
+
+  it('생성 성공 후 실패한 재요청에서 이전 초대코드가 남지 않습니다',async()=>{
+    render(<GroupsPage/>);
+    const submitCreate=()=>fireEvent.submit(screen.getByRole('button',{name:'그룹 생성'}).closest('form')!);
+
+    rpc.mockResolvedValueOnce({data:[{group_id:'g1',invite_code:'ABC123DEF456'}],error:null});
+    fireEvent.change(screen.getByLabelText('그룹 이름'),{target:{value:'점심팀'}});
+    submitCreate();
+    await waitFor(()=>expect(screen.getByText('초대코드: ABC123DEF456')).toBeInTheDocument());
+
+    rpc.mockResolvedValueOnce({error:{message:'그룹 생성 실패'}});
+    fireEvent.change(screen.getByLabelText('그룹 이름'),{target:{value:'실패팀'}});
+    submitCreate();
+    await waitFor(()=>expect(screen.getByRole('status')).toHaveTextContent('그룹 생성 실패'));
+    expect(screen.queryByText('초대코드: ABC123DEF456')).not.toBeInTheDocument();
+  });
+
+  it('실패한 요청 후 성공한 재요청에서 이전 에러 메시지가 남지 않습니다',async()=>{
+    render(<GroupsPage/>);
+    const submitCreate=()=>fireEvent.submit(screen.getByRole('button',{name:'그룹 생성'}).closest('form')!);
+
+    rpc.mockResolvedValueOnce({error:{message:'그룹 생성 실패'}});
+    fireEvent.change(screen.getByLabelText('그룹 이름'),{target:{value:'실패팀'}});
+    submitCreate();
+    await waitFor(()=>expect(screen.getByRole('status')).toHaveTextContent('그룹 생성 실패'));
+
+    rpc.mockResolvedValueOnce({data:[{group_id:'g2',invite_code:'XYZ789GHI012'}],error:null});
+    fireEvent.change(screen.getByLabelText('그룹 이름'),{target:{value:'점심팀'}});
+    submitCreate();
+    await waitFor(()=>expect(screen.getByText('초대코드: XYZ789GHI012')).toBeInTheDocument());
+    expect(screen.queryByText('그룹 생성 실패')).not.toBeInTheDocument();
+  });
 });
