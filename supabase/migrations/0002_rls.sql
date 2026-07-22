@@ -103,3 +103,17 @@ end;
 $$;
 revoke all on function public.create_group(text) from public;
 grant execute on function public.create_group(text) to authenticated;
+
+-- 요금폭탄 주의: 스팸 요청이 구글 API 과금으로 직결되므로 사용자+IP 이중 제한 카운터를
+-- 원자적으로 증가시킨다. anon/authenticated는 직접 호출할 수 없고 service role
+-- (Edge Function)에서만 사용해야 한다.
+create function public.increment_api_usage(p_user_id uuid, p_ip inet, p_window_start timestamptz)
+returns integer language sql security definer set search_path = public as $$
+  insert into public.api_usage(user_id, ip, window_start, count)
+  values (p_user_id, p_ip, p_window_start, 1)
+  on conflict (user_id, ip, window_start)
+  do update set count = public.api_usage.count + 1
+  returning count;
+$$;
+revoke all on function public.increment_api_usage(uuid, inet, timestamptz) from public;
+grant execute on function public.increment_api_usage(uuid, inet, timestamptz) to service_role;
