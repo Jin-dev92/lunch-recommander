@@ -11,11 +11,14 @@ export function createNearbyHandler(deps:NearbyDeps) {
     if (!user) return Response.json({error:'인증이 필요합니다.'},{status:401});
     const ip=request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown';
     if (!await deps.checkLimit(user.id,ip)) return Response.json({error:'요청 한도를 초과했습니다.'},{status:429});
-    const body=await request.json();
+    let body:any;
+    try { body=await request.json(); } catch { return Response.json({error:'요청 본문이 올바른 JSON 형식이 아닙니다.'},{status:400}); }
     if (!Number.isFinite(body.lat)||!Number.isFinite(body.lng)||![500,1000].includes(body.radius)) return Response.json({error:'위치 또는 반경이 올바르지 않습니다.'},{status:400});
     const cached=await deps.findCached(body.lat,body.lng,body.radius);
     if (cached.length) return Response.json({restaurants:cached,source:'cache'});
-    const restaurants=await deps.fetchGoogle(body.lat,body.lng,body.radius);
+    let restaurants:NearbyRestaurant[];
+    try { restaurants=await deps.fetchGoogle(body.lat,body.lng,body.radius); }
+    catch { return Response.json({error:'외부 위치 정보 조회에 실패했습니다.'},{status:502}); }
     await deps.upsert(restaurants);
     return Response.json({restaurants,source:'google'});
   };
@@ -34,30 +37,69 @@ function distanceMeters(lat1:number,lng1:number,lat2:number,lng2:number):number 
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-if (import.meta.main) {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const googlePlacesApiKey = Deno.env.get('GOOGLE_PLACES_API_KEY')!;
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
-  const usageStore: UsageStore = {
-    // ponytail: select 후 upsert라 동시 요청 시 카운트 경합 가능. 원자적 증가가 필요해지면 DB 함수(rpc)로 승격.
+type RpcClient = { rpc(fn: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }> };
+
+// 원자적 증가는 반드시 DB 함수 `increment_api_usage`(INSERT ... ON CONFLICT DO UPDATE ... RETURNING count,
+// service_role 전용, supabase/migrations/0002_rls.sql)를 통해서만 수행합니다.
+// select 후 upsert로 TS에서 재구현하면 동시 요청 간 카운트 경합으로 한도 우회(요금폭탄 위험)가 발생합니다.
+export function createUsageStore(supabase: RpcClient): UsageStore {
+  return {
     increment: async (key) => {
-      const { data: existing, error: selectError } = await supabase
-        .from('api_usage')
-        .select('count')
-        .eq('user_id', key.userId)
-        .eq('ip', key.ip)
-        .eq('window_start', key.windowStart)
-        .maybeSingle();
-      if (selectError) throw selectError;
-      const next = (existing?.count ?? 0) + 1;
-      const { error: upsertError } = await supabase
-        .from('api_usage')
-        .upsert({ user_id: key.userId, ip: key.ip, window_start: key.windowStart, count: next });
-      if (upsertError) throw upsertError;
-      return next;
+      const { data, error } = await supabase.rpc('increment_api_usage', {
+        p_user_id: key.userId,
+        p_ip: key.ip,
+        p_window_start: key.windowStart,
+      });
+      if (error) throw error;
+      return data as number;
     },
   };
+}
+
+export function createGoogleFetcher(googlePlacesApiKey: string): NearbyDeps['fetchGoogle'] {
+  return async (lat, lng, radius) => {
+    const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': googlePlacesApiKey,
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.primaryType,places.location,places.rating,places.userRatingCount',
+      },
+      body: JSON.stringify({
+        maxResultCount: 20,
+        locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius } },
+        includedTypes: ['restaurant'],
+      }),
+    });
+    if (!response.ok) throw new Error(`Google Places API 오류: ${response.status}`);
+    let json: any;
+    try { json = await response.json(); } catch { throw new Error('Google Places API 응답을 파싱할 수 없습니다.'); }
+    const places = json.places ?? [];
+    return places.map((place: any) => ({
+      placeId: place.id,
+      name: place.displayName?.text ?? '',
+      category: place.primaryType ?? '기타',
+      lat: place.location?.latitude,
+      lng: place.location?.longitude,
+      googleRating: place.rating ?? null,
+      googleRatingsTotal: place.userRatingCount ?? 0,
+      distanceMeters: distanceMeters(lat, lng, place.location?.latitude, place.location?.longitude),
+    }));
+  };
+}
+
+function requireEnv(name: string): string {
+  const value = Deno.env.get(name);
+  if (!value) throw new Error(`필수 환경변수 ${name}가 설정되지 않았습니다.`);
+  return value;
+}
+
+if (import.meta.main) {
+  const supabaseUrl = requireEnv('SUPABASE_URL');
+  const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+  const googlePlacesApiKey = requireEnv('GOOGLE_PLACES_API_KEY');
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const usageStore = createUsageStore(supabase);
 
   const deps: NearbyDeps = {
     authenticate: async (jwt) => {
@@ -86,33 +128,7 @@ if (import.meta.main) {
         }))
         .filter((row) => row.distanceMeters <= radius);
     },
-    fetchGoogle: async (lat, lng, radius) => {
-      const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': googlePlacesApiKey,
-          'X-Goog-FieldMask': 'places.id,places.displayName,places.primaryType,places.location,places.rating,places.userRatingCount',
-        },
-        body: JSON.stringify({
-          maxResultCount: 20,
-          locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius } },
-          includedTypes: ['restaurant'],
-        }),
-      });
-      const json = await response.json();
-      const places = json.places ?? [];
-      return places.map((place: any) => ({
-        placeId: place.id,
-        name: place.displayName?.text ?? '',
-        category: place.primaryType ?? '기타',
-        lat: place.location?.latitude,
-        lng: place.location?.longitude,
-        googleRating: place.rating ?? null,
-        googleRatingsTotal: place.userRatingCount ?? 0,
-        distanceMeters: distanceMeters(lat, lng, place.location?.latitude, place.location?.longitude),
-      }));
-    },
+    fetchGoogle: createGoogleFetcher(googlePlacesApiKey),
     upsert: async (rows) => {
       if (!rows.length) return;
       const { error } = await supabase.from('restaurants').upsert(
