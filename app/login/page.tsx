@@ -6,6 +6,9 @@ import styles from './login.module.css';
 export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [requestMessage, setRequestMessage] = useState('');
+  const [requestError, setRequestError] = useState('');
+  const [requestLoading, setRequestLoading] = useState(false);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -22,6 +25,20 @@ export default function LoginPage() {
       document.cookie = 'sb-session=1; path=/; max-age=604800; samesite=lax';
       location.assign('/');
     }
+  }
+
+  async function requestSignup(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setRequestLoading(true);
+    setRequestMessage('');
+    setRequestError('');
+    const data = new FormData(e.currentTarget);
+    const { data: result, error } = await supabase.functions.invoke('signup-request', {
+      body: { email: String(data.get('signup-email')) },
+    });
+    if (error) setRequestError(error.message);
+    else setRequestMessage(result?.message ?? '승인되면 메일로 안내됩니다');
+    setRequestLoading(false);
   }
 
   return (
@@ -58,6 +75,35 @@ export default function LoginPage() {
           {error && (
             <p className={styles.error} role="alert">
               {error}
+            </p>
+          )}
+        </form>
+        <hr className={styles.divider} />
+        <h2 className={styles.sectionTitle}>회원가입 요청</h2>
+        <form className={styles.form} onSubmit={requestSignup}>
+          <label className={styles.field} htmlFor="signup-email">
+            회원가입 요청 이메일
+            <input
+              className={styles.input}
+              id="signup-email"
+              name="signup-email"
+              type="email"
+              autoComplete="email"
+              required
+            />
+          </label>
+          <button
+            className={styles.button}
+            type="submit"
+            disabled={requestLoading}
+            aria-busy={requestLoading}
+          >
+            {requestLoading ? '요청 중…' : '회원가입 요청'}
+          </button>
+          {requestMessage && <p role="status">{requestMessage}</p>}
+          {requestError && (
+            <p className={styles.error} role="alert">
+              {requestError}
             </p>
           )}
         </form>

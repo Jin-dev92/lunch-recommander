@@ -1,12 +1,16 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../lib/supabaseClient', () => ({
-  supabase: { auth: { signInWithPassword: vi.fn() } },
+  supabase: {
+    auth: { signInWithPassword: vi.fn() },
+    functions: { invoke: vi.fn() },
+  },
 }));
 import { supabase } from '../../lib/supabaseClient';
 import LoginPage from './page';
 
 const signInWithPassword = supabase.auth.signInWithPassword as ReturnType<typeof vi.fn>;
+const invoke = supabase.functions.invoke as ReturnType<typeof vi.fn>;
 
 function fillAndSubmit() {
   fireEvent.change(screen.getByLabelText('이메일'), {
@@ -22,6 +26,7 @@ describe('로그인', () => {
   let assign: ReturnType<typeof vi.fn>;
   beforeEach(() => {
     signInWithPassword.mockReset();
+    invoke.mockReset();
     document.cookie = 'sb-session=; path=/; max-age=0';
     assign = vi.fn();
     // ponytail: jsdom의 window.location.assign은 non-configurable이라 vi.spyOn으로 못 덮어씀 → location 객체 자체를 교체
@@ -57,5 +62,32 @@ describe('로그인', () => {
     );
     expect(assign).not.toHaveBeenCalled();
     expect(document.cookie).not.toContain('sb-session=1');
+  });
+
+  it('회원가입 요청 성공 안내를 표시합니다', async () => {
+    invoke.mockResolvedValue({ data: { message: '승인되면 메일로 안내됩니다' }, error: null });
+    render(<LoginPage />);
+    fireEvent.change(screen.getByLabelText('회원가입 요청 이메일'), {
+      target: { value: 'guest@example.com' },
+    });
+    fireEvent.submit(screen.getByRole('button', { name: '회원가입 요청' }).closest('form')!);
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('승인되면 메일로 안내됩니다'),
+    );
+    expect(invoke).toHaveBeenCalledWith('signup-request', {
+      body: { email: 'guest@example.com' },
+    });
+  });
+
+  it('회원가입 요청 오류를 alert로 표시합니다', async () => {
+    invoke.mockResolvedValue({ data: null, error: { message: '요청 한도를 초과했습니다.' } });
+    render(<LoginPage />);
+    fireEvent.change(screen.getByLabelText('회원가입 요청 이메일'), {
+      target: { value: 'guest@example.com' },
+    });
+    fireEvent.submit(screen.getByRole('button', { name: '회원가입 요청' }).closest('form')!);
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('요청 한도를 초과했습니다.'),
+    );
   });
 });
