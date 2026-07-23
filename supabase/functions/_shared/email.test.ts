@@ -30,6 +30,34 @@ Deno.test('Resend에 관리자 승인 링크를 담아 발송합니다', async (
   });
 });
 
+Deno.test('requesterEmail에 담긴 HTML은 이스케이프되어 발송됩니다', async () => {
+  let captured: { url: string; init?: RequestInit } | undefined;
+  const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    captured = { url: String(input), init };
+    return Response.json({ id: 'email-1' }, { status: 200 });
+  }) as typeof fetch;
+
+  await sendAdminNotification(
+    { fetch: fakeFetch, apiKey: 'resend-secret', from: '가입 알림 <signup@example.com>' },
+    {
+      to: 'admin@example.com',
+      approveUrl: 'https://lunch.example.com/admin/approve?token=abc',
+      requesterEmail: '<script>alert(1)</script>@example.com',
+    },
+  );
+
+  const { html } = JSON.parse(String(captured?.init?.body));
+  assertEquals(
+    html.includes('<script>alert(1)</script>@example.com 님이'),
+    false,
+    '이스케이프되지 않은 HTML이 그대로 들어가면 안 됩니다',
+  );
+  assertEquals(
+    html.includes('&lt;script&gt;alert(1)&lt;/script&gt;@example.com 님이'),
+    true,
+  );
+});
+
 Deno.test('Resend 오류 응답을 성공으로 처리하지 않습니다', async () => {
   const fakeFetch = (async () =>
     Response.json({ message: 'invalid api key' }, { status: 401 })) as typeof fetch;
