@@ -22,13 +22,15 @@ export function createApproveSignupHandler(deps: ApproveSignupDeps) {
   return async (request: Request): Promise<Response> => {
     try {
       let token = new URL(request.url).searchParams.get('token') ?? '';
-      let action: 'approve' | 'reject' | undefined;
+      let action: 'approve' | 'reject' | 'info' | undefined;
       if (request.method === 'POST') {
         const body = await request.json().catch(() => null) as
           | { token?: unknown; action?: unknown }
           | null;
         token = typeof body?.token === 'string' ? body.token : '';
-        action = body?.action === 'approve' || body?.action === 'reject' ? body.action : undefined;
+        action = body?.action === 'approve' || body?.action === 'reject' || body?.action === 'info'
+          ? body.action
+          : undefined;
         if (!action)
           return Response.json({ error: '승인 동작이 올바르지 않습니다.' }, { status: 400 });
       } else if (request.method !== 'GET') {
@@ -37,7 +39,9 @@ export function createApproveSignupHandler(deps: ApproveSignupDeps) {
       const row = token ? await deps.findRequest(token) : null;
       if (!valid(row, deps.now()))
         return Response.json({ error: '만료되었거나 유효하지 않은 요청입니다.' }, { status: 410 });
-      if (request.method === 'GET')
+      // GET과 POST action:'info'는 상태를 바꾸지 않는 조회 전용 경로다(브라우저는
+      // supabase.functions.invoke가 GET+쿼리를 지원하지 않아 info를 쓰고, GET은 하위 호환용).
+      if (request.method === 'GET' || action === 'info')
         return Response.json({ email: row.email, status: row.status });
 
       // 토큰을 먼저 "선점"한다(pending → approved/rejected 조건부 갱신). 동시 요청 중

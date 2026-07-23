@@ -2,13 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { supabase } from '../../../lib/supabaseClient';
 import styles from '../../login/login.module.css';
-
-const functionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/approve-signup`;
-const headers = {
-  apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
-  'Content-Type': 'application/json',
-};
 
 type SignupRequest = {
   email: string;
@@ -22,22 +17,16 @@ export default function ApprovePage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
 
   useEffect(() => {
     void (async () => {
-      try {
-        const response = await fetch(`${functionUrl}?token=${encodeURIComponent(token)}`, {
-          method: 'GET',
-          headers,
-        });
-        const body = await response.json();
-        if (!response.ok) setError(body.error);
-        else setRequest(body);
-      } catch {
-        setError('요청 정보를 불러오지 못했습니다.');
-      } finally {
-        setLoading(false);
-      }
+      const { data, error } = await supabase.functions.invoke<SignupRequest>('approve-signup', {
+        body: { token, action: 'info' },
+      });
+      if (error) setError(error.message);
+      else setRequest(data);
+      setLoading(false);
     })();
   }, [token]);
 
@@ -46,24 +35,20 @@ export default function ApprovePage() {
     setError('');
     setMessage('');
 
-    try {
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ token, action }),
-      });
-      const body = await response.json();
-      if (!response.ok) {
-        setError(body.error);
-        return;
-      }
-      if (body.alreadyRegistered) setMessage('이미 가입된 사용자입니다.');
-      else setMessage(action === 'approve' ? '승인 완료' : '거절 완료');
-    } catch {
-      setError('요청을 처리하지 못했습니다.');
-    } finally {
+    const { data, error } = await supabase.functions.invoke<{ alreadyRegistered?: boolean }>(
+      'approve-signup',
+      { body: { token, action } },
+    );
+    if (error) {
+      setError(error.message);
       setSubmitting(false);
+      return;
     }
+    setMessage(
+      data?.alreadyRegistered ? '이미 가입된 사용자입니다.' : action === 'approve' ? '승인 완료' : '거절 완료',
+    );
+    setDone(true);
+    setSubmitting(false);
   }
 
   return (
@@ -81,24 +66,28 @@ export default function ApprovePage() {
             <p>
               상태: <strong>{request.status}</strong>
             </p>
-            <button
-              className={styles.button}
-              type="button"
-              disabled={submitting}
-              aria-busy={submitting}
-              onClick={() => void decide('approve')}
-            >
-              승인
-            </button>
-            <button
-              className={styles.button}
-              type="button"
-              disabled={submitting}
-              aria-busy={submitting}
-              onClick={() => void decide('reject')}
-            >
-              거절
-            </button>
+            {!done && (
+              <>
+                <button
+                  className={styles.button}
+                  type="button"
+                  disabled={submitting}
+                  aria-busy={submitting}
+                  onClick={() => void decide('approve')}
+                >
+                  승인
+                </button>
+                <button
+                  className={styles.button}
+                  type="button"
+                  disabled={submitting}
+                  aria-busy={submitting}
+                  onClick={() => void decide('reject')}
+                >
+                  거절
+                </button>
+              </>
+            )}
           </div>
         )}
         {message && <p role="status">{message}</p>}

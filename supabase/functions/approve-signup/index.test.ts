@@ -17,11 +17,11 @@ function makeDeps(overrides: Partial<ApproveSignupDeps> = {}): ApproveSignupDeps
     ...overrides,
   };
 }
-function post(action: 'approve' | 'reject') {
+function post(action: 'approve' | 'reject' | 'info', token = 'token-1') {
   return new Request('https://edge.example.com/approve-signup', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ token: 'token-1', action }),
+    body: JSON.stringify({ token, action }),
   });
 }
 
@@ -42,6 +42,27 @@ Deno.test('없거나 만료된 토큰을 거부합니다', async () => {
     const response = await createApproveSignupHandler(deps)(
       new Request('https://edge.example.com/approve-signup?token=bad'),
     );
+    assertEquals(response.status, 410);
+  }
+});
+
+Deno.test('POST action:info는 유효한 토큰의 이메일과 상태를 반환하고 상태를 바꾸지 않습니다', async () => {
+  let updated = false;
+  const response = await createApproveSignupHandler(
+    makeDeps({ updateStatus: async () => { updated = true; return true; } }),
+  )(post('info'));
+  assertEquals(response.status, 200);
+  assertEquals(await response.json(), { email: 'guest@example.com', status: 'pending' });
+  assertEquals(updated, false);
+});
+
+Deno.test('POST action:info는 없거나 만료된 토큰을 거부합니다', async () => {
+  const cases = [
+    makeDeps({ findRequest: async () => null }),
+    makeDeps({ findRequest: async () => ({ ...pending, expires_at: '2026-07-22T00:00:00.000Z' }) }),
+  ];
+  for (const deps of cases) {
+    const response = await createApproveSignupHandler(deps)(post('info', 'bad'));
     assertEquals(response.status, 410);
   }
 });
