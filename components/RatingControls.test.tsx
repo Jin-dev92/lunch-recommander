@@ -10,16 +10,26 @@ const from = supabase.from as ReturnType<typeof vi.fn>;
 
 function mockRatings(
   existingScore: number | null | undefined = undefined,
-  options: { lookupError?: unknown; upsertError?: unknown } = {}
+  options: { lookupError?: unknown; upsertError?: unknown } = {},
 ) {
   const upsert = vi.fn().mockResolvedValue({ data: null, error: options.upsertError ?? null });
   const maybeSingle = vi.fn().mockResolvedValue({
-    data: options.lookupError ? null : existingScore === undefined ? null : { score: existingScore },
+    data: options.lookupError
+      ? null
+      : existingScore === undefined
+        ? null
+        : { score: existingScore },
     error: options.lookupError ?? null,
   });
-  const chain: { eq: ReturnType<typeof vi.fn>; maybeSingle: typeof maybeSingle } = { eq: vi.fn(), maybeSingle };
+  const chain: {
+    eq: ReturnType<typeof vi.fn>;
+    maybeSingle: typeof maybeSingle;
+  } = { eq: vi.fn(), maybeSingle };
   chain.eq.mockReturnValue(chain);
-  from.mockImplementation(() => ({ upsert, select: vi.fn().mockReturnValue(chain) }));
+  from.mockImplementation(() => ({
+    upsert,
+    select: vi.fn().mockReturnValue(chain),
+  }));
   return { upsert, maybeSingle };
 }
 
@@ -33,7 +43,10 @@ describe('평점 저장', () => {
     render(<RatingControls placeId="p1" userId="me" />);
     fireEvent.click(screen.getByRole('button', { name: `${score}점` }));
     await vi.waitFor(() =>
-      expect(upsert).toHaveBeenCalledWith({ user_id: 'me', place_id: 'p1', score }, { onConflict: 'user_id,place_id' })
+      expect(upsert).toHaveBeenCalledWith(
+        { user_id: 'me', place_id: 'p1', score },
+        { onConflict: 'user_id,place_id' },
+      ),
     );
   });
 
@@ -68,7 +81,9 @@ describe('평점 저장', () => {
   });
 
   it('점수 조회에 실패하면 upsert하지 않고 에러를 표시합니다', async () => {
-    const { upsert } = mockRatings(undefined, { lookupError: { message: 'db error' } });
+    const { upsert } = mockRatings(undefined, {
+      lookupError: { message: 'db error' },
+    });
     render(<RatingControls placeId="p1" userId="me" />);
     fireEvent.click(screen.getByRole('button', { name: '1주간 그만 보기' }));
     await screen.findByRole('alert');

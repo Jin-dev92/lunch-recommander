@@ -32,16 +32,34 @@ export default function LoginPage() {
         <form className={styles.form} onSubmit={submit}>
           <label className={styles.field} htmlFor="email">
             이메일
-            <input className={styles.input} id="email" name="email" type="email" autoComplete="email" required />
+            <input
+              className={styles.input}
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+            />
           </label>
           <label className={styles.field} htmlFor="password">
             비밀번호
-            <input className={styles.input} id="password" name="password" type="password" autoComplete="current-password" required />
+            <input
+              className={styles.input}
+              id="password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+            />
           </label>
           <button className={styles.button} type="submit" disabled={loading} aria-busy={loading}>
             {loading ? '로그인 중…' : '로그인'}
           </button>
-          {error && <p className={styles.error} role="alert">{error}</p>}
+          {error && (
+            <p className={styles.error} role="alert">
+              {error}
+            </p>
+          )}
         </form>
       </div>
     </div>

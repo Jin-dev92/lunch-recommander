@@ -20,10 +20,12 @@
 ### Task 1: Next.js 보안 패치 적용
 
 **Files:**
+
 - Modify: `package.json`
 - Modify: `package-lock.json`
 
 **Interfaces:**
+
 - Consumes: npm 패키지 레지스트리와 기존 `package-lock.json`
 - Produces: `next@15.5.21`, `eslint-config-next@15.5.21`이 고정된 의존성 트리
 
@@ -61,10 +63,12 @@ git commit -m "fix: Next.js 보안 패치 적용"
 ### Task 2: Prettier 규칙 명시 및 전체 포맷 적용
 
 **Files:**
+
 - Create: `.prettierrc.json`
 - Modify: Prettier가 지원하는 프로젝트 내 추적 파일
 
 **Interfaces:**
+
 - Consumes: `package.json`의 `format`, `format:check` 스크립트와 `.prettierignore`
 - Produces: 로컬과 CI에서 동일하게 재현되는 코드 포맷
 
@@ -112,9 +116,11 @@ git commit -m "style: Prettier 규칙을 전체 프로젝트에 적용"
 ### Task 3: 회귀 및 최종 상태 검증
 
 **Files:**
+
 - Verify: 전체 작업 트리
 
 **Interfaces:**
+
 - Consumes: Task 1과 Task 2의 변경 결과
 - Produces: 포맷, 테스트, 타입, 보안 감사 결과
 

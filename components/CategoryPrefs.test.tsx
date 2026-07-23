@@ -23,7 +23,7 @@ describe('카테고리 기호 저장', () => {
     expect(from).toHaveBeenCalledWith('category_prefs');
     expect(upsert).toHaveBeenCalledWith(
       { user_id: 'me', category: '한식', weight: 1.5 },
-      { onConflict: 'user_id,category' }
+      { onConflict: 'user_id,category' },
     );
   });
 
@@ -46,7 +46,7 @@ describe('카테고리 기호 저장', () => {
     fireEvent.blur(input);
     expect(upsert).toHaveBeenCalledWith(
       { user_id: 'me', category: '한식', weight: 2.5 },
-      { onConflict: 'user_id,category' }
+      { onConflict: 'user_id,category' },
     );
   });
 });

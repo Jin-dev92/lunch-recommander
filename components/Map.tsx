@@ -30,7 +30,10 @@ export default function Map({ onLocationChange }: { onLocationChange: (value: Lo
       setError('지도를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
       return;
     }
-    const map = new google.maps.Map(node.current!, { center: coords, zoom: 16 });
+    const map = new google.maps.Map(node.current!, {
+      center: coords,
+      zoom: 16,
+    });
     new google.maps.Marker({ position: coords, map });
   }, [coords]);
 
