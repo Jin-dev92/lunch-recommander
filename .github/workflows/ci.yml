@@ -40,6 +40,7 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      # index.ts가 Deno 전역(Deno.serve 등)을 쓰므로 타입체크는 건너뛰고 런타임 테스트만 수행
+      # index.ts가 Deno 전역(Deno.serve 등)을 쓰므로 타입체크는 건너뛰고 런타임 테스트만 수행.
+      # @supabase/supabase-js의 npm 전이 의존을 CI에서 자동 설치하도록 --node-modules-dir=auto 지정.
       - name: Deno 테스트
-        run: deno test --no-check --allow-env supabase/functions/
+        run: deno test --no-check --allow-env --node-modules-dir=auto supabase/functions/
