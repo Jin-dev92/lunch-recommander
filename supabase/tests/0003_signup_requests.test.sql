@@ -1,5 +1,5 @@
 begin;
-select plan(16);
+select plan(18);
 
 select has_table('public', 'signup_requests', 'signup_requests exists');
 select col_is_pk('public', 'signup_requests', 'id', 'id is primary key');
@@ -20,6 +20,17 @@ select throws_ok(
   $$insert into public.signup_requests(email, request_ip, token, status, expires_at)
     values ('bad@example.com', '127.0.0.1', 'bad-status-token', 'unknown', now() + interval '3 days')$$,
   '23514', null, 'unknown status is rejected'
+);
+
+select lives_ok(
+  $$insert into public.signup_requests(email, request_ip, token, expires_at)
+    values ('dup@example.com', '127.0.0.1', 'dup-token-1', now() + interval '3 days')$$,
+  'first pending row for an email is allowed'
+);
+select throws_ok(
+  $$insert into public.signup_requests(email, request_ip, token, expires_at)
+    values ('dup@example.com', '127.0.0.1', 'dup-token-2', now() + interval '3 days')$$,
+  '23505', null, 'second pending row for the same email is blocked by the partial unique index'
 );
 
 set local role anon;
