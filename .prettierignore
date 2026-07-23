@@ -2,3 +2,6 @@
 coverage/
 node_modules/
 .vercel/
+# 위키에서 생성되는 규칙 문서와 에이전트 작업 디렉터리는 포맷 대상이 아니다
+CLAUDE.md
+.claude/

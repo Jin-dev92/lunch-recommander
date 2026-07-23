@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../lib/supabaseClient', () => ({ supabase: { rpc: vi.fn() } }));
 import { supabase } from '../../lib/supabaseClient';
+import { renderWithQuery } from '../../tests/renderWithQuery';
 import GroupsPage from './page';
 
 const rpc = supabase.rpc as ReturnType<typeof vi.fn>;
@@ -12,13 +13,13 @@ describe('그룹', () => {
   });
 
   it('생성과 가입 입력을 표시합니다', () => {
-    render(<GroupsPage />);
+    renderWithQuery(<GroupsPage />);
     expect(screen.getByLabelText('그룹 이름')).toBeInTheDocument();
     expect(screen.getByLabelText('초대코드')).toBeInTheDocument();
   });
 
   it('추천 화면으로 돌아가는 링크를 보여줍니다', () => {
-    render(<GroupsPage />);
+    renderWithQuery(<GroupsPage />);
     expect(screen.getByRole('link', { name: '추천 화면으로' })).toHaveAttribute('href', '/');
   });
 
@@ -27,7 +28,7 @@ describe('그룹', () => {
       data: [{ group_id: 'g1', invite_code: 'ABC123DEF456' }],
       error: null,
     });
-    render(<GroupsPage />);
+    renderWithQuery(<GroupsPage />);
     fireEvent.change(screen.getByLabelText('그룹 이름'), {
       target: { value: '점심팀' },
     });
@@ -38,7 +39,7 @@ describe('그룹', () => {
 
   it('초대코드 가입 성공 시 안내 메시지를 표시합니다', async () => {
     rpc.mockResolvedValue({ error: null });
-    render(<GroupsPage />);
+    renderWithQuery(<GroupsPage />);
     fireEvent.change(screen.getByLabelText('초대코드'), {
       target: { value: 'ABC123DEF456' },
     });
@@ -55,7 +56,7 @@ describe('그룹', () => {
     rpc.mockResolvedValue({
       error: { message: '유효하지 않은 초대코드입니다' },
     });
-    render(<GroupsPage />);
+    renderWithQuery(<GroupsPage />);
     fireEvent.change(screen.getByLabelText('초대코드'), {
       target: { value: 'WRONGCODE' },
     });
@@ -66,7 +67,7 @@ describe('그룹', () => {
   });
 
   it('생성 성공 후 실패한 재요청에서 이전 초대코드가 남지 않습니다', async () => {
-    render(<GroupsPage />);
+    renderWithQuery(<GroupsPage />);
     const submitCreate = () =>
       fireEvent.submit(screen.getByRole('button', { name: '그룹 생성' }).closest('form')!);
 
@@ -90,7 +91,7 @@ describe('그룹', () => {
   });
 
   it('실패한 요청 후 성공한 재요청에서 이전 에러 메시지가 남지 않습니다', async () => {
-    render(<GroupsPage />);
+    renderWithQuery(<GroupsPage />);
     const submitCreate = () =>
       fireEvent.submit(screen.getByRole('button', { name: '그룹 생성' }).closest('form')!);
 

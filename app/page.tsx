@@ -3,28 +3,32 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Map from '../components/Map';
 import Recommend from '../components/Recommend';
-import { supabase } from '../lib/supabaseClient';
-
-type SearchLocation = { lat: number; lng: number; radius: 500 | 1000 };
+import { ROUTES, SESSION_COOKIE } from '../lib/constants';
+import { useSignOut } from '../lib/hooks/mutations';
+import { errorMessage } from '../lib/messages';
+import type { SearchLocation } from '../lib/types/api';
 
 export default function HomePage() {
-  const [error, setError] = useState('');
   const [searchLocation, setSearchLocation] = useState<SearchLocation | null>(null);
-  async function logout() {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      setError(error.message);
-      return;
-    }
-    document.cookie = 'sb-session=; path=/; max-age=0';
-    window.location.assign('/login');
-  }
+  const signOut = useSignOut();
+
+  // 쿠키 정리·화면 이동은 UI 후처리이므로 mutation hook이 아니라 여기서 처리한다.
+  const logout = () =>
+    signOut.mutate(undefined, {
+      onSuccess: () => {
+        document.cookie = `${SESSION_COOKIE}=; path=/; max-age=0`;
+        window.location.assign(ROUTES.LOGIN);
+      },
+    });
+
   return (
     <main>
       <h1>점심 추천</h1>
-      <Link href="/groups">그룹 관리</Link>
-      <button onClick={logout}>로그아웃</button>
-      {error && <p role="alert">{error}</p>}
+      <Link href={ROUTES.GROUPS}>그룹 관리</Link>
+      <button onClick={logout} disabled={signOut.isPending}>
+        로그아웃
+      </button>
+      {signOut.isError && <p role="alert">{errorMessage(signOut.error)}</p>}
       <Map onLocationChange={setSearchLocation} />
       {searchLocation && (
         <p>

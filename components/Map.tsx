@@ -1,11 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import type { SearchLocation } from '../lib/types/api';
+import { MESSAGES } from '../lib/messages';
 
-type Location = { lat: number; lng: number; radius: 500 | 1000 };
 type Coords = { lat: number; lng: number };
 
-export default function Map({ onLocationChange }: { onLocationChange: (value: Location) => void }) {
+export default function Map({
+  onLocationChange,
+}: {
+  onLocationChange: (value: SearchLocation) => void;
+}) {
   const node = useRef<HTMLDivElement>(null);
   const [radius, setRadius] = useState<500 | 1000>(500);
   const [coords, setCoords] = useState<Coords | null>(null);
@@ -15,19 +20,21 @@ export default function Map({ onLocationChange }: { onLocationChange: (value: Lo
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => setCoords({ lat: coords.latitude, lng: coords.longitude }),
-      () => setError('현재 위치 권한이 필요합니다.'),
+      () => setError(MESSAGES.GEOLOCATION_DENIED),
     );
   }, []);
 
+  // deps에 coords 객체나 onLocationChange 참조를 그대로 넣으면 참조가 바뀔 때마다 재실행된다.
   useEffect(() => {
     if (coords) onLocationChange({ ...coords, radius });
-  }, [coords, radius, onLocationChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coords?.lat, coords?.lng, radius]);
 
   // 지도/마커는 좌표가 처음 정해질 때만 생성한다. 반경 변경으로 다시 만들 필요는 없다.
   useEffect(() => {
     if (!coords) return;
     if (typeof google === 'undefined' || !google.maps) {
-      setError('지도를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+      setError(MESSAGES.MAP_LOAD_FAILED);
       return;
     }
     const map = new google.maps.Map(node.current!, {
@@ -35,7 +42,8 @@ export default function Map({ onLocationChange }: { onLocationChange: (value: Lo
       zoom: 16,
     });
     new google.maps.Marker({ position: coords, map });
-  }, [coords]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coords?.lat, coords?.lng]);
 
   return (
     <section>

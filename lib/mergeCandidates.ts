@@ -1,22 +1,5 @@
 import type { Candidate } from './recommend';
-
-type NearbyRestaurant = {
-  placeId: string;
-  name: string;
-  category: string;
-  lat: number;
-  lng: number;
-  googleRating: number | null;
-  googleRatingsTotal: number;
-  distanceMeters: number;
-};
-type RatingRow = {
-  user_id: string;
-  place_id: string;
-  score: number;
-  snoozed_until: string | null;
-};
-type CategoryPrefRow = { category: string; weight: number };
+import type { CategoryPrefRow, NearbyRestaurant, RatingRow } from './types/api';
 
 export function mergeCandidates(
   restaurants: NearbyRestaurant[],

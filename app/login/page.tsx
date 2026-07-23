@@ -1,45 +1,28 @@
 'use client';
-import { FormEvent, useState } from 'react';
-import { supabase } from '../../lib/supabaseClient';
+import { useForm } from 'react-hook-form';
+import { ROUTES, SESSION_COOKIE, SESSION_COOKIE_MAX_AGE_SECONDS } from '../../lib/constants';
+import { useRequestSignup, useSignIn } from '../../lib/hooks/mutations';
+import { errorMessage } from '../../lib/messages';
+import type { SignInRequest, SignupRequest } from '../../lib/types/api';
 import styles from './login.module.css';
 
 export default function LoginPage() {
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [requestMessage, setRequestMessage] = useState('');
-  const [requestError, setRequestError] = useState('');
-  const [requestLoading, setRequestLoading] = useState(false);
+  const signInForm = useForm<SignInRequest>();
+  const signupForm = useForm<SignupRequest>();
+  const signIn = useSignIn();
+  const requestSignup = useRequestSignup();
 
-  async function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setLoading(true);
-    const data = new FormData(e.currentTarget);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: String(data.get('email')),
-      password: String(data.get('password')),
-    });
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
-      document.cookie = 'sb-session=1; path=/; max-age=604800; samesite=lax';
-      location.assign('/');
-    }
-  }
+  // 쿠키 심기·화면 이동은 UI 후처리이므로 mutation hook이 아니라 소비 컴포넌트가 맡는다.
+  const submit = signInForm.handleSubmit((values) =>
+    signIn.mutate(values, {
+      onSuccess: () => {
+        document.cookie = `${SESSION_COOKIE}=1; path=/; max-age=${SESSION_COOKIE_MAX_AGE_SECONDS}; samesite=lax`;
+        location.assign(ROUTES.HOME);
+      },
+    }),
+  );
 
-  async function requestSignup(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setRequestLoading(true);
-    setRequestMessage('');
-    setRequestError('');
-    const data = new FormData(e.currentTarget);
-    const { data: result, error } = await supabase.functions.invoke('signup-request', {
-      body: { email: String(data.get('signup-email')) },
-    });
-    if (error) setRequestError(error.message);
-    else setRequestMessage(result?.message ?? '승인되면 메일로 안내됩니다');
-    setRequestLoading(false);
-  }
+  const submitSignupRequest = signupForm.handleSubmit((values) => requestSignup.mutate(values));
 
   return (
     <div className={styles.wrap}>
@@ -52,10 +35,10 @@ export default function LoginPage() {
             <input
               className={styles.input}
               id="email"
-              name="email"
               type="email"
               autoComplete="email"
               required
+              {...signInForm.register('email', { required: true })}
             />
           </label>
           <label className={styles.field} htmlFor="password">
@@ -63,47 +46,52 @@ export default function LoginPage() {
             <input
               className={styles.input}
               id="password"
-              name="password"
               type="password"
               autoComplete="current-password"
               required
-            />
-          </label>
-          <button className={styles.button} type="submit" disabled={loading} aria-busy={loading}>
-            {loading ? '로그인 중…' : '로그인'}
-          </button>
-          {error && (
-            <p className={styles.error} role="alert">
-              {error}
-            </p>
-          )}
-        </form>
-        <hr className={styles.divider} />
-        <h2 className={styles.sectionTitle}>회원가입 요청</h2>
-        <form className={styles.form} onSubmit={requestSignup}>
-          <label className={styles.field} htmlFor="signup-email">
-            회원가입 요청 이메일
-            <input
-              className={styles.input}
-              id="signup-email"
-              name="signup-email"
-              type="email"
-              autoComplete="email"
-              required
+              {...signInForm.register('password', { required: true })}
             />
           </label>
           <button
             className={styles.button}
             type="submit"
-            disabled={requestLoading}
-            aria-busy={requestLoading}
+            disabled={signIn.isPending}
+            aria-busy={signIn.isPending}
           >
-            {requestLoading ? '요청 중…' : '회원가입 요청'}
+            {signIn.isPending ? '로그인 중…' : '로그인'}
           </button>
-          {requestMessage && <p role="status">{requestMessage}</p>}
-          {requestError && (
+          {signIn.isError && (
             <p className={styles.error} role="alert">
-              {requestError}
+              {errorMessage(signIn.error)}
+            </p>
+          )}
+        </form>
+        <hr className={styles.divider} />
+        <h2 className={styles.sectionTitle}>회원가입 요청</h2>
+        <form className={styles.form} onSubmit={submitSignupRequest}>
+          <label className={styles.field} htmlFor="signup-email">
+            회원가입 요청 이메일
+            <input
+              className={styles.input}
+              id="signup-email"
+              type="email"
+              autoComplete="email"
+              required
+              {...signupForm.register('email', { required: true })}
+            />
+          </label>
+          <button
+            className={styles.button}
+            type="submit"
+            disabled={requestSignup.isPending}
+            aria-busy={requestSignup.isPending}
+          >
+            {requestSignup.isPending ? '요청 중…' : '회원가입 요청'}
+          </button>
+          {requestSignup.isSuccess && <p role="status">{requestSignup.data}</p>}
+          {requestSignup.isError && (
+            <p className={styles.error} role="alert">
+              {errorMessage(requestSignup.error)}
             </p>
           )}
         </form>

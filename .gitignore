@@ -15,3 +15,5 @@ supabase/.env
 .vercel
 .gstack/
 .worktrees/
+# 에이전트 로컬 설정과 git worktree 사본
+.claude/
