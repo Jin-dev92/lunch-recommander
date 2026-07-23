@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import styles from '../../login/login.module.css';
@@ -10,7 +10,7 @@ type SignupRequest = {
   status: string;
 };
 
-export default function ApprovePage() {
+function ApproveInner() {
   const token = useSearchParams().get('token') ?? '';
   const [request, setRequest] = useState<SignupRequest | null>(null);
   const [message, setMessage] = useState('');
@@ -98,5 +98,13 @@ export default function ApprovePage() {
         )}
       </section>
     </main>
+  );
+}
+
+export default function ApprovePage() {
+  return (
+    <Suspense fallback={null}>
+      <ApproveInner />
+    </Suspense>
   );
 }
