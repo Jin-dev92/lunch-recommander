@@ -17,7 +17,9 @@ describe('미들웨어', () => {
   });
 
   it('sb-session 쿠키가 있으면 통과시킵니다', () => {
-    const req = new NextRequest(new URL('http://localhost/groups/1'), { headers: { cookie: 'sb-session=1' } });
+    const req = new NextRequest(new URL('http://localhost/groups/1'), {
+      headers: { cookie: 'sb-session=1' },
+    });
     const res = middleware(req);
     expect(res.headers.get('location')).toBeNull();
   });

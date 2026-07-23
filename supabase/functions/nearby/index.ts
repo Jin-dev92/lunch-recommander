@@ -1,26 +1,54 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { checkRateLimit, type UsageStore } from '../_shared/rateLimit.ts';
 
-export type NearbyRestaurant={placeId:string;name:string;category:string;lat:number;lng:number;googleRating:number|null;googleRatingsTotal:number;distanceMeters:number};
-export type NearbyDeps={authenticate:(jwt:string)=>Promise<{id:string}|null>;checkLimit:(userId:string,ip:string)=>Promise<boolean>;findCached:(lat:number,lng:number,radius:number)=>Promise<NearbyRestaurant[]>;fetchGoogle:(lat:number,lng:number,radius:number)=>Promise<NearbyRestaurant[]>;upsert:(rows:NearbyRestaurant[])=>Promise<void>};
+export type NearbyRestaurant = {
+  placeId: string;
+  name: string;
+  category: string;
+  lat: number;
+  lng: number;
+  googleRating: number | null;
+  googleRatingsTotal: number;
+  distanceMeters: number;
+};
+export type NearbyDeps = {
+  authenticate: (jwt: string) => Promise<{ id: string } | null>;
+  checkLimit: (userId: string, ip: string) => Promise<boolean>;
+  findCached: (lat: number, lng: number, radius: number) => Promise<NearbyRestaurant[]>;
+  fetchGoogle: (lat: number, lng: number, radius: number) => Promise<NearbyRestaurant[]>;
+  upsert: (rows: NearbyRestaurant[]) => Promise<void>;
+};
 
-export function createNearbyHandler(deps:NearbyDeps) {
-  return async (request:Request):Promise<Response> => {
-    const jwt=request.headers.get('authorization')?.replace(/^Bearer /,'');
-    const user=jwt ? await deps.authenticate(jwt) : null;
-    if (!user) return Response.json({error:'인증이 필요합니다.'},{status:401});
-    const ip=request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown';
-    if (!await deps.checkLimit(user.id,ip)) return Response.json({error:'요청 한도를 초과했습니다.'},{status:429});
-    let body:any;
-    try { body=await request.json(); } catch { return Response.json({error:'요청 본문이 올바른 JSON 형식이 아닙니다.'},{status:400}); }
-    if (!Number.isFinite(body.lat)||!Number.isFinite(body.lng)||![500,1000].includes(body.radius)) return Response.json({error:'위치 또는 반경이 올바르지 않습니다.'},{status:400});
-    const cached=await deps.findCached(body.lat,body.lng,body.radius);
-    if (cached.length) return Response.json({restaurants:cached,source:'cache'});
-    let restaurants:NearbyRestaurant[];
-    try { restaurants=await deps.fetchGoogle(body.lat,body.lng,body.radius); }
-    catch { return Response.json({error:'외부 위치 정보 조회에 실패했습니다.'},{status:502}); }
+export function createNearbyHandler(deps: NearbyDeps) {
+  return async (request: Request): Promise<Response> => {
+    const jwt = request.headers.get('authorization')?.replace(/^Bearer /, '');
+    const user = jwt ? await deps.authenticate(jwt) : null;
+    if (!user) return Response.json({ error: '인증이 필요합니다.' }, { status: 401 });
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown';
+    if (!(await deps.checkLimit(user.id, ip)))
+      return Response.json({ error: '요청 한도를 초과했습니다.' }, { status: 429 });
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: '요청 본문이 올바른 JSON 형식이 아닙니다.' }, { status: 400 });
+    }
+    if (
+      !Number.isFinite(body.lat) ||
+      !Number.isFinite(body.lng) ||
+      ![500, 1000].includes(body.radius)
+    )
+      return Response.json({ error: '위치 또는 반경이 올바르지 않습니다.' }, { status: 400 });
+    const cached = await deps.findCached(body.lat, body.lng, body.radius);
+    if (cached.length) return Response.json({ restaurants: cached, source: 'cache' });
+    let restaurants: NearbyRestaurant[];
+    try {
+      restaurants = await deps.fetchGoogle(body.lat, body.lng, body.radius);
+    } catch {
+      return Response.json({ error: '외부 위치 정보 조회에 실패했습니다.' }, { status: 502 });
+    }
     await deps.upsert(restaurants);
-    return Response.json({restaurants,source:'google'});
+    return Response.json({ restaurants, source: 'google' });
   };
 }
 
@@ -28,16 +56,20 @@ export function createNearbyHandler(deps:NearbyDeps) {
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
-function distanceMeters(lat1:number,lng1:number,lat2:number,lng2:number):number {
+function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
-  const toRad = (deg:number) => (deg * Math.PI) / 180;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
   const dLng = toRad(lng2 - lng1);
-  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-type RpcClient = { rpc(fn: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }> };
+type RpcClient = {
+  rpc(fn: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }>;
+};
 
 // 원자적 증가는 반드시 DB 함수 `increment_api_usage`(INSERT ... ON CONFLICT DO UPDATE ... RETURNING count,
 // service_role 전용, supabase/migrations/0002_rls.sql)를 통해서만 수행합니다.
@@ -63,17 +95,24 @@ export function createGoogleFetcher(googlePlacesApiKey: string): NearbyDeps['fet
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': googlePlacesApiKey,
-        'X-Goog-FieldMask': 'places.id,places.displayName,places.primaryType,places.location,places.rating,places.userRatingCount',
+        'X-Goog-FieldMask':
+          'places.id,places.displayName,places.primaryType,places.location,places.rating,places.userRatingCount',
       },
       body: JSON.stringify({
         maxResultCount: 20,
-        locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius } },
+        locationRestriction: {
+          circle: { center: { latitude: lat, longitude: lng }, radius },
+        },
         includedTypes: ['restaurant'],
       }),
     });
     if (!response.ok) throw new Error(`Google Places API 오류: ${response.status}`);
     let json: any;
-    try { json = await response.json(); } catch { throw new Error('Google Places API 응답을 파싱할 수 없습니다.'); }
+    try {
+      json = await response.json();
+    } catch {
+      throw new Error('Google Places API 응답을 파싱할 수 없습니다.');
+    }
     const places = json.places ?? [];
     return places.map((place: any) => ({
       placeId: place.id,

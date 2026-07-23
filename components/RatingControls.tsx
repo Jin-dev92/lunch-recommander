@@ -24,8 +24,13 @@ export default function RatingControls({ placeId, userId }: { placeId: string; u
       .maybeSingle();
     if (lookupError) return setError('스누즈 처리에 실패했습니다.');
     const { error: saveError } = await supabase.from('ratings').upsert(
-      { user_id: userId, place_id: placeId, score: data?.score ?? 3, snoozed_until: snoozedUntilOneWeekFrom(new Date()) },
-      { onConflict: 'user_id,place_id' }
+      {
+        user_id: userId,
+        place_id: placeId,
+        score: data?.score ?? 3,
+        snoozed_until: snoozedUntilOneWeekFrom(new Date()),
+      },
+      { onConflict: 'user_id,place_id' },
     );
     if (saveError) setError('스누즈 처리에 실패했습니다.');
   }
@@ -33,7 +38,9 @@ export default function RatingControls({ placeId, userId }: { placeId: string; u
   return (
     <section aria-label="개인 평점">
       {[0, 1, 2, 3, 4, 5].map((score) => (
-        <button key={score} onClick={() => save(score)}>{score}점</button>
+        <button key={score} onClick={() => save(score)}>
+          {score}점
+        </button>
       ))}
       <button onClick={snooze}>1주간 그만 보기</button>
       {error && <p role="alert">{error}</p>}

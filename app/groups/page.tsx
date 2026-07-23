@@ -15,7 +15,9 @@ export default function GroupsPage() {
     setInvite('');
     setMessage('');
     setError('');
-    const { data, error: createError } = await supabase.rpc('create_group', { group_name: name });
+    const { data, error: createError } = await supabase.rpc('create_group', {
+      group_name: name,
+    });
     if (createError) {
       setError(createError.message);
     } else {
@@ -28,7 +30,9 @@ export default function GroupsPage() {
     const code = String(new FormData(e.currentTarget).get('code')).trim();
     setMessage('');
     setError('');
-    const { error: joinError } = await supabase.rpc('join_group_by_code', { code });
+    const { error: joinError } = await supabase.rpc('join_group_by_code', {
+      code,
+    });
     if (joinError) {
       setError(joinError.message);
     } else {

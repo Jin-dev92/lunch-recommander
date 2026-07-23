@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../lib/supabaseClient', () => ({ supabase: { auth: { signOut: vi.fn() } } }));
+vi.mock('../lib/supabaseClient', () => ({
+  supabase: { auth: { signOut: vi.fn() } },
+}));
 // ponytail: 이 테스트는 로그아웃 흐름만 검증하므로 실제 위치 권한/지도 SDK를 타는 Map은 모킹
 vi.mock('../components/Map', () => ({ default: () => null }));
 import { supabase } from '../lib/supabaseClient';
@@ -15,7 +17,10 @@ describe('로그아웃', () => {
     document.cookie = 'sb-session=1; path=/';
     assign = vi.fn();
     // ponytail: jsdom의 window.location.assign은 non-configurable이라 vi.spyOn으로 못 덮어씀 → location 객체 자체를 교체
-    Object.defineProperty(window, 'location', { writable: true, value: { ...window.location, assign } });
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { ...window.location, assign },
+    });
   });
 
   it('성공 시 세션 쿠키를 지우고 로그인 페이지로 이동합니다', async () => {

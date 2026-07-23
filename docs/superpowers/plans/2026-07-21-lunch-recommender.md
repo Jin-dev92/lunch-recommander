@@ -22,6 +22,7 @@
 ### Task 1: 프로젝트 스캐폴드
 
 **Files:**
+
 - Create: `package.json`
 - Create: `app/layout.tsx`
 - Create: `app/page.tsx`
@@ -39,6 +40,7 @@
 - Test: `tests/sanity.test.ts`
 
 **Interfaces:**
+
 - Consumes: Node.js 20 이상, Docker Desktop, `npx supabase` 실행 환경입니다.
 - Produces: `npm run dev`, `npm test`, `npm run typecheck` 스크립트와 Next.js App Router 진입점, Supabase 로컬 프로젝트를 제공합니다.
 
@@ -124,14 +126,22 @@ Expected: FAIL과 함께 `vitest: command not found`가 출력됩니다.
 import './globals.css';
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ko"><body>{children}</body></html>;
+  return (
+    <html lang="ko">
+      <body>{children}</body>
+    </html>
+  );
 }
 ```
 
 ```tsx
 // app/page.tsx
 export default function HomePage() {
-  return <main><h1>점심 추천</h1></main>;
+  return (
+    <main>
+      <h1>점심 추천</h1>
+    </main>
+  );
 }
 ```
 
@@ -177,11 +187,13 @@ git commit -m "chore: 점심 추천 프로젝트 스캐폴드 구성"
 ### Task 2: DB 스키마 마이그레이션
 
 **Files:**
+
 - Create: `supabase/migrations/0001_schema.sql`
 - Create: `supabase/tests/0001_schema.test.sql`
 - Test: `supabase/tests/0001_schema.test.sql`
 
 **Interfaces:**
+
 - Consumes: Task 1의 로컬 Supabase 프로젝트입니다.
 - Produces: `profiles`, `groups`, `group_members`, `restaurants`, `ratings`, `category_prefs`, `api_usage` 테이블과 명시된 PK·FK·unique·check 제약을 제공합니다.
 
@@ -281,11 +293,13 @@ git commit -m "feat: 점심 추천 데이터 스키마 추가"
 ### Task 3: RLS 정책과 초대코드 가입 RPC
 
 **Files:**
+
 - Create: `supabase/migrations/0002_rls.sql`
 - Create: `supabase/tests/0002_rls.test.sql`
 - Test: `supabase/tests/0002_rls.test.sql`
 
 **Interfaces:**
+
 - Consumes: Task 2의 7개 public 테이블과 `auth.uid()`입니다.
 - Produces: `public.shares_group_with(uuid) returns boolean`, `public.join_group_by_code(code text) returns uuid`, `public.create_group(group_name text) returns table(group_id uuid, invite_code text)` 및 모든 테이블의 RLS 정책을 제공합니다.
 
@@ -425,11 +439,13 @@ git commit -m "feat: 그룹 경계 RLS와 초대코드 가입 추가"
 ### Task 4: 추천 순수 로직
 
 **Files:**
+
 - Create: `lib/recommend.ts`
 - Create: `lib/recommend.test.ts`
 - Test: `lib/recommend.test.ts`
 
 **Interfaces:**
+
 - Consumes: `Candidate`, `RecommendationPrefs`, 현재 시각, `rng: () => number`입니다.
 - Produces: `scoreCandidate(candidate: Candidate, prefs: RecommendationPrefs): number`, `filterCandidates(candidates: Candidate[], now: Date): Candidate[]`, `pickWeightedRandom<T extends { weight: number }>(candidates: T[], rng: () => number): T | null`입니다.
 
@@ -439,26 +455,46 @@ git commit -m "feat: 그룹 경계 RLS와 초대코드 가입 추가"
 import { describe, expect, it } from 'vitest';
 import { filterCandidates, pickWeightedRandom, scoreCandidate, type Candidate } from './recommend';
 
-const base: Candidate = { placeId:'a', category:'한식', distanceMeters:100, googleRating:4, googleRatingsTotal:100, personalRating:null, groupAverage:null, snoozedUntil:null };
+const base: Candidate = {
+  placeId: 'a',
+  category: '한식',
+  distanceMeters: 100,
+  googleRating: 4,
+  googleRatingsTotal: 100,
+  personalRating: null,
+  groupAverage: null,
+  snoozedUntil: null,
+};
 
 describe('추천', () => {
   it('0점과 미래 스누즈를 제외하고 지난 스누즈를 포함합니다', () => {
     const now = new Date('2026-07-21T03:00:00Z');
     const candidates = [
-      { ...base, placeId:'zero', personalRating:0 },
-      { ...base, placeId:'future', snoozedUntil:'2026-07-22T03:00:00Z' },
-      { ...base, placeId:'past', snoozedUntil:'2026-07-20T03:00:00Z' },
+      { ...base, placeId: 'zero', personalRating: 0 },
+      { ...base, placeId: 'future', snoozedUntil: '2026-07-22T03:00:00Z' },
+      { ...base, placeId: 'past', snoozedUntil: '2026-07-20T03:00:00Z' },
     ];
     expect(filterCandidates(candidates, now).map((x) => x.placeId)).toEqual(['past']);
   });
   it('결측 평점을 중립값으로 계산합니다', () => {
-    expect(scoreCandidate(base, { categoryWeights:{}, maxDistanceMeters:1000 })).toBeGreaterThan(0);
+    expect(scoreCandidate(base, { categoryWeights: {}, maxDistanceMeters: 1000 })).toBeGreaterThan(
+      0,
+    );
   });
   it('결정적 rng에서 높은 가중치가 더 자주 선택됩니다', () => {
     let state = 1;
-    const rng = () => ((state = state * 16807 % 2147483647) - 1) / 2147483646;
-    const counts = { low:0, high:0 };
-    for (let i=0; i<1000; i++) counts[pickWeightedRandom([{id:'low',weight:1},{id:'high',weight:9}], rng)!.id]++;
+    const rng = () => ((state = (state * 16807) % 2147483647) - 1) / 2147483646;
+    const counts = { low: 0, high: 0 };
+    for (let i = 0; i < 1000; i++)
+      counts[
+        pickWeightedRandom(
+          [
+            { id: 'low', weight: 1 },
+            { id: 'high', weight: 9 },
+          ],
+          rng,
+        )!.id
+      ]++;
     expect(counts.high).toBeGreaterThan(800);
   });
 });
@@ -473,14 +509,34 @@ Expected: FAIL과 함께 `Failed to resolve import "./recommend"`가 출력됩�
 - [ ] **Step 3: 최소 추천 순수 함수를 구현합니다**
 
 ```ts
-export type Candidate = { placeId:string; category:string; distanceMeters:number; googleRating:number|null; googleRatingsTotal:number; personalRating:number|null; groupAverage:number|null; snoozedUntil:string|null };
-export type RecommendationPrefs = { categoryWeights:Record<string,number>; maxDistanceMeters:number };
+export type Candidate = {
+  placeId: string;
+  category: string;
+  distanceMeters: number;
+  googleRating: number | null;
+  googleRatingsTotal: number;
+  personalRating: number | null;
+  groupAverage: number | null;
+  snoozedUntil: string | null;
+};
+export type RecommendationPrefs = {
+  categoryWeights: Record<string, number>;
+  maxDistanceMeters: number;
+};
 
 // ponytail: 휴리스틱 가중치, 써보고 조정
-const EXPONENTS = { category:1, personal:1, group:1, google:1, distance:1 } as const;
+const EXPONENTS = {
+  category: 1,
+  personal: 1,
+  group: 1,
+  google: 1,
+  distance: 1,
+} as const;
 
 export function filterCandidates(candidates: Candidate[], now: Date): Candidate[] {
-  return candidates.filter((c) => c.personalRating !== 0 && (!c.snoozedUntil || new Date(c.snoozedUntil) <= now));
+  return candidates.filter(
+    (c) => c.personalRating !== 0 && (!c.snoozedUntil || new Date(c.snoozedUntil) <= now),
+  );
 }
 
 export function scoreCandidate(candidate: Candidate, prefs: RecommendationPrefs): number {
@@ -488,17 +544,30 @@ export function scoreCandidate(candidate: Candidate, prefs: RecommendationPrefs)
   const personal = candidate.personalRating == null ? 1 : candidate.personalRating / 3;
   const group = candidate.groupAverage == null ? 1 : candidate.groupAverage / 3;
   const reviewConfidence = candidate.googleRatingsTotal / (candidate.googleRatingsTotal + 20);
-  const google = candidate.googleRating == null ? 1 : 1 + ((candidate.googleRating / 5) - 1) * reviewConfidence;
+  const google =
+    candidate.googleRating == null ? 1 : 1 + (candidate.googleRating / 5 - 1) * reviewConfidence;
   const distance = 1 + 0.2 * Math.max(0, 1 - candidate.distanceMeters / prefs.maxDistanceMeters);
-  return category ** EXPONENTS.category * personal ** EXPONENTS.personal * group ** EXPONENTS.group * google ** EXPONENTS.google * distance ** EXPONENTS.distance;
+  return (
+    category ** EXPONENTS.category *
+    personal ** EXPONENTS.personal *
+    group ** EXPONENTS.group *
+    google ** EXPONENTS.google *
+    distance ** EXPONENTS.distance
+  );
 }
 
-export function pickWeightedRandom<T extends {weight:number}>(candidates:T[], rng:()=>number):T|null {
+export function pickWeightedRandom<T extends { weight: number }>(
+  candidates: T[],
+  rng: () => number,
+): T | null {
   const valid = candidates.filter((item) => Number.isFinite(item.weight) && item.weight > 0);
-  const total = valid.reduce((sum,item) => sum + item.weight, 0);
+  const total = valid.reduce((sum, item) => sum + item.weight, 0);
   if (total === 0) return null;
   let cursor = rng() * total;
-  for (const item of valid) { cursor -= item.weight; if (cursor < 0) return item; }
+  for (const item of valid) {
+    cursor -= item.weight;
+    if (cursor < 0) return item;
+  }
   return valid.at(-1) ?? null;
 }
 ```
@@ -519,12 +588,14 @@ git commit -m "feat: 가중치와 가중 랜덤 추천 로직 추가"
 ### Task 5: Rate limit 로직
 
 **Files:**
+
 - Create: `supabase/functions/_shared/rateLimit.ts`
 - Create: `supabase/functions/_shared/rateLimit.test.ts`
 - Create: `supabase/functions/deno.json`
 - Test: `supabase/functions/_shared/rateLimit.test.ts`
 
 **Interfaces:**
+
 - Consumes: `UsageStore.increment(key: {userId:string; ip:string; windowStart:string}): Promise<number>`입니다.
 - Produces: `checkRateLimit(store: UsageStore, userId: string, ip: string, now?: Date): Promise<{allowed:boolean; count:number; limit:number}>`입니다.
 
@@ -537,8 +608,9 @@ import { checkRateLimit, type UsageStore } from './rateLimit.ts';
 Deno.test('한도 이하는 허용하고 초과는 차단합니다', async () => {
   let count = 0;
   const store: UsageStore = { increment: async () => ++count };
-  for (let i=0; i<10; i++) assertEquals((await checkRateLimit(store,'u1','127.0.0.1')).allowed, true);
-  assertEquals((await checkRateLimit(store,'u1','127.0.0.1')).allowed, false);
+  for (let i = 0; i < 10; i++)
+    assertEquals((await checkRateLimit(store, 'u1', '127.0.0.1')).allowed, true);
+  assertEquals((await checkRateLimit(store, 'u1', '127.0.0.1')).allowed, false);
 });
 ```
 
@@ -551,12 +623,19 @@ Expected: FAIL과 함께 `Module not found "rateLimit.ts"`가 출력됩니다.
 - [ ] **Step 3: 고정 1분 윈도우 제한을 구현합니다**
 
 ```ts
-export type UsageStore = { increment(key:{userId:string;ip:string;windowStart:string}):Promise<number> };
+export type UsageStore = {
+  increment(key: { userId: string; ip: string; windowStart: string }): Promise<number>;
+};
 const LIMIT_PER_MINUTE = 10;
 
-export async function checkRateLimit(store:UsageStore,userId:string,ip:string,now=new Date()) {
+export async function checkRateLimit(
+  store: UsageStore,
+  userId: string,
+  ip: string,
+  now = new Date(),
+) {
   // 요금폭탄 주의: 스팸 요청이 구글 API 과금으로 직결
-  const windowStart = new Date(Math.floor(now.getTime()/60_000)*60_000).toISOString();
+  const windowStart = new Date(Math.floor(now.getTime() / 60_000) * 60_000).toISOString();
   const count = await store.increment({ userId, ip, windowStart });
   return { allowed: count <= LIMIT_PER_MINUTE, count, limit: LIMIT_PER_MINUTE };
 }
@@ -580,11 +659,13 @@ git commit -m "feat: 사용자와 IP 기반 사용량 제한 추가"
 ### Task 6: Nearby Edge Function
 
 **Files:**
+
 - Create: `supabase/functions/nearby/index.ts`
 - Create: `supabase/functions/nearby/index.test.ts`
 - Test: `supabase/functions/nearby/index.test.ts`
 
 **Interfaces:**
+
 - Consumes: Bearer JWT, `{lat:number; lng:number; radius:500|1000}`, `checkRateLimit`, `GOOGLE_PLACES_API_KEY`, service-role DB 접근입니다.
 - Produces: `createNearbyHandler(deps: NearbyDeps): (request: Request) => Promise<Response>`와 `{restaurants: NearbyRestaurant[]; source:'cache'|'google'}` JSON 응답입니다.
 
@@ -595,16 +676,56 @@ import { assertEquals } from 'jsr:@std/assert';
 import { createNearbyHandler } from './index.ts';
 
 Deno.test('사용량 초과는 429입니다', async () => {
-  const handler = createNearbyHandler({ authenticate:async()=>({id:'u1'}), checkLimit:async()=>false, findCached:async()=>[], fetchGoogle:async()=>[], upsert:async()=>{} });
-  const response = await handler(new Request('http://local',{method:'POST',headers:{authorization:'Bearer jwt','x-forwarded-for':'127.0.0.1'},body:JSON.stringify({lat:37,lng:127,radius:500})}));
-  assertEquals(response.status,429);
+  const handler = createNearbyHandler({
+    authenticate: async () => ({ id: 'u1' }),
+    checkLimit: async () => false,
+    findCached: async () => [],
+    fetchGoogle: async () => [],
+    upsert: async () => {},
+  });
+  const response = await handler(
+    new Request('http://local', {
+      method: 'POST',
+      headers: { authorization: 'Bearer jwt', 'x-forwarded-for': '127.0.0.1' },
+      body: JSON.stringify({ lat: 37, lng: 127, radius: 500 }),
+    }),
+  );
+  assertEquals(response.status, 429);
 });
 Deno.test('캐시 히트 시 Google을 호출하지 않습니다', async () => {
-  let googleCalls=0;
-  const cached=[{placeId:'p1',name:'식당',category:'한식',lat:37,lng:127,googleRating:4,googleRatingsTotal:20,distanceMeters:10}];
-  const handler=createNearbyHandler({authenticate:async()=>({id:'u1'}),checkLimit:async()=>true,findCached:async()=>cached,fetchGoogle:async()=>{googleCalls++;return[];},upsert:async()=>{}});
-  const response=await handler(new Request('http://local',{method:'POST',headers:{authorization:'Bearer jwt','x-forwarded-for':'127.0.0.1'},body:JSON.stringify({lat:37,lng:127,radius:500})}));
-  assertEquals(response.status,200); assertEquals(googleCalls,0); assertEquals((await response.json()).source,'cache');
+  let googleCalls = 0;
+  const cached = [
+    {
+      placeId: 'p1',
+      name: '식당',
+      category: '한식',
+      lat: 37,
+      lng: 127,
+      googleRating: 4,
+      googleRatingsTotal: 20,
+      distanceMeters: 10,
+    },
+  ];
+  const handler = createNearbyHandler({
+    authenticate: async () => ({ id: 'u1' }),
+    checkLimit: async () => true,
+    findCached: async () => cached,
+    fetchGoogle: async () => {
+      googleCalls++;
+      return [];
+    },
+    upsert: async () => {},
+  });
+  const response = await handler(
+    new Request('http://local', {
+      method: 'POST',
+      headers: { authorization: 'Bearer jwt', 'x-forwarded-for': '127.0.0.1' },
+      body: JSON.stringify({ lat: 37, lng: 127, radius: 500 }),
+    }),
+  );
+  assertEquals(response.status, 200);
+  assertEquals(googleCalls, 0);
+  assertEquals((await response.json()).source, 'cache');
 });
 ```
 
@@ -617,23 +738,44 @@ Expected: FAIL과 함께 `Module not found "index.ts"`가 출력됩니다.
 - [ ] **Step 3: 주입 가능한 HTTP 핸들러와 운영 어댑터를 구현합니다**
 
 ```ts
-export type NearbyRestaurant={placeId:string;name:string;category:string;lat:number;lng:number;googleRating:number|null;googleRatingsTotal:number;distanceMeters:number};
-export type NearbyDeps={authenticate:(jwt:string)=>Promise<{id:string}|null>;checkLimit:(userId:string,ip:string)=>Promise<boolean>;findCached:(lat:number,lng:number,radius:number)=>Promise<NearbyRestaurant[]>;fetchGoogle:(lat:number,lng:number,radius:number)=>Promise<NearbyRestaurant[]>;upsert:(rows:NearbyRestaurant[])=>Promise<void>};
+export type NearbyRestaurant = {
+  placeId: string;
+  name: string;
+  category: string;
+  lat: number;
+  lng: number;
+  googleRating: number | null;
+  googleRatingsTotal: number;
+  distanceMeters: number;
+};
+export type NearbyDeps = {
+  authenticate: (jwt: string) => Promise<{ id: string } | null>;
+  checkLimit: (userId: string, ip: string) => Promise<boolean>;
+  findCached: (lat: number, lng: number, radius: number) => Promise<NearbyRestaurant[]>;
+  fetchGoogle: (lat: number, lng: number, radius: number) => Promise<NearbyRestaurant[]>;
+  upsert: (rows: NearbyRestaurant[]) => Promise<void>;
+};
 
-export function createNearbyHandler(deps:NearbyDeps) {
-  return async (request:Request):Promise<Response> => {
-    const jwt=request.headers.get('authorization')?.replace(/^Bearer /,'');
-    const user=jwt ? await deps.authenticate(jwt) : null;
-    if (!user) return Response.json({error:'인증이 필요합니다.'},{status:401});
-    const ip=request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown';
-    if (!await deps.checkLimit(user.id,ip)) return Response.json({error:'요청 한도를 초과했습니다.'},{status:429});
-    const body=await request.json();
-    if (!Number.isFinite(body.lat)||!Number.isFinite(body.lng)||![500,1000].includes(body.radius)) return Response.json({error:'위치 또는 반경이 올바르지 않습니다.'},{status:400});
-    const cached=await deps.findCached(body.lat,body.lng,body.radius);
-    if (cached.length) return Response.json({restaurants:cached,source:'cache'});
-    const restaurants=await deps.fetchGoogle(body.lat,body.lng,body.radius);
+export function createNearbyHandler(deps: NearbyDeps) {
+  return async (request: Request): Promise<Response> => {
+    const jwt = request.headers.get('authorization')?.replace(/^Bearer /, '');
+    const user = jwt ? await deps.authenticate(jwt) : null;
+    if (!user) return Response.json({ error: '인증이 필요합니다.' }, { status: 401 });
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown';
+    if (!(await deps.checkLimit(user.id, ip)))
+      return Response.json({ error: '요청 한도를 초과했습니다.' }, { status: 429 });
+    const body = await request.json();
+    if (
+      !Number.isFinite(body.lat) ||
+      !Number.isFinite(body.lng) ||
+      ![500, 1000].includes(body.radius)
+    )
+      return Response.json({ error: '위치 또는 반경이 올바르지 않습니다.' }, { status: 400 });
+    const cached = await deps.findCached(body.lat, body.lng, body.radius);
+    if (cached.length) return Response.json({ restaurants: cached, source: 'cache' });
+    const restaurants = await deps.fetchGoogle(body.lat, body.lng, body.radius);
     await deps.upsert(restaurants);
-    return Response.json({restaurants,source:'google'});
+    return Response.json({ restaurants, source: 'google' });
   };
 }
 ```
@@ -660,6 +802,7 @@ git commit -m "feat: 캐시 우선 nearby Edge Function 추가"
 ### Task 7: 인증 로그인
 
 **Files:**
+
 - Create: `lib/supabaseClient.ts`
 - Create: `app/login/page.tsx`
 - Create: `app/login/page.test.tsx`
@@ -667,18 +810,28 @@ git commit -m "feat: 캐시 우선 nearby Edge Function 추가"
 - Test: `app/login/page.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, Supabase Auth `signInWithPassword`/`signOut`입니다.
 - Produces: `supabase` 브라우저 클라이언트, 이메일·비밀번호 로그인 폼, 미인증 보호 라우트 리다이렉트를 제공합니다.
 
 - [ ] **Step 1: 로그인 폼 렌더링 실패 테스트를 작성합니다**
 
 ```tsx
-import { render,screen } from '@testing-library/react';
-import { describe,expect,it,vi } from 'vitest';
-vi.mock('../../lib/supabaseClient',()=>({supabase:{auth:{signInWithPassword:vi.fn()}}}));
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock('../../lib/supabaseClient', () => ({
+  supabase: { auth: { signInWithPassword: vi.fn() } },
+}));
 import LoginPage from './page';
 
-describe('로그인',()=>{it('이메일과 비밀번호 입력을 표시합니다',()=>{render(<LoginPage/>);expect(screen.getByLabelText('이메일')).toBeInTheDocument();expect(screen.getByLabelText('비밀번호')).toBeInTheDocument();expect(screen.getByRole('button',{name:'로그인'})).toBeInTheDocument();});});
+describe('로그인', () => {
+  it('이메일과 비밀번호 입력을 표시합니다', () => {
+    render(<LoginPage />);
+    expect(screen.getByLabelText('이메일')).toBeInTheDocument();
+    expect(screen.getByLabelText('비밀번호')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '로그인' })).toBeInTheDocument();
+  });
+});
 ```
 
 - [ ] **Step 2: 로그인 테스트 실패를 확인합니다**
@@ -692,15 +845,44 @@ Expected: FAIL과 함께 `Failed to resolve import "./page"`가 출력됩니다.
 ```ts
 // lib/supabaseClient.ts
 import { createClient } from '@supabase/supabase-js';
-export const supabase=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+);
 ```
 
 ```tsx
 // app/login/page.tsx
 'use client';
-import { FormEvent,useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-export default function LoginPage(){const [error,setError]=useState('');async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();const data=new FormData(e.currentTarget);const {error}=await supabase.auth.signInWithPassword({email:String(data.get('email')),password:String(data.get('password'))});if(error)setError(error.message);else location.assign('/');}return <form onSubmit={submit}><label>이메일<input name="email" type="email" required/></label><label>비밀번호<input name="password" type="password" required/></label><button>로그인</button>{error&&<p role="alert">{error}</p>}</form>;}
+export default function LoginPage() {
+  const [error, setError] = useState('');
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const data = new FormData(e.currentTarget);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: String(data.get('email')),
+      password: String(data.get('password')),
+    });
+    if (error) setError(error.message);
+    else location.assign('/');
+  }
+  return (
+    <form onSubmit={submit}>
+      <label>
+        이메일
+        <input name="email" type="email" required />
+      </label>
+      <label>
+        비밀번호
+        <input name="password" type="password" required />
+      </label>
+      <button>로그인</button>
+      {error && <p role="alert">{error}</p>}
+    </form>
+  );
+}
 ```
 
 `middleware.ts`는 Supabase 세션 쿠키가 없는 `/`, `/groups` 요청을 `/login`으로 리다이렉트하고 `/login`은 통과시킵니다. 공통 헤더의 로그아웃 버튼은 `supabase.auth.signOut()` 성공 후 `/login`으로 이동합니다.
@@ -723,22 +905,30 @@ git commit -m "feat: Supabase 로그인과 보호 라우트 추가"
 ### Task 8: 그룹 생성·가입 UI
 
 **Files:**
+
 - Create: `app/groups/page.tsx`
 - Create: `app/groups/page.test.tsx`
 - Test: `app/groups/page.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `supabase.rpc('create_group',{group_name:string})`, `supabase.rpc('join_group_by_code',{code:string})`입니다.
 - Produces: 그룹 이름 생성 폼, 생성된 `invite_code` 표시, 초대코드 가입 폼입니다.
 
 - [ ] **Step 1: 그룹 생성·가입 폼의 실패 테스트를 작성합니다**
 
 ```tsx
-import { render,screen } from '@testing-library/react';
-import { describe,expect,it,vi } from 'vitest';
-vi.mock('../../lib/supabaseClient',()=>({supabase:{rpc:vi.fn()}}));
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock('../../lib/supabaseClient', () => ({ supabase: { rpc: vi.fn() } }));
 import GroupsPage from './page';
-describe('그룹',()=>{it('생성과 가입 입력을 표시합니다',()=>{render(<GroupsPage/>);expect(screen.getByLabelText('그룹 이름')).toBeInTheDocument();expect(screen.getByLabelText('초대코드')).toBeInTheDocument();});});
+describe('그룹', () => {
+  it('생성과 가입 입력을 표시합니다', () => {
+    render(<GroupsPage />);
+    expect(screen.getByLabelText('그룹 이름')).toBeInTheDocument();
+    expect(screen.getByLabelText('초대코드')).toBeInTheDocument();
+  });
+});
 ```
 
 - [ ] **Step 2: 그룹 UI 테스트 실패를 확인합니다**
@@ -751,9 +941,47 @@ Expected: FAIL과 함께 `Failed to resolve import "./page"`가 출력됩니다.
 
 ```tsx
 'use client';
-import { FormEvent,useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-export default function GroupsPage(){const [invite,setInvite]=useState('');const [message,setMessage]=useState('');async function create(e:FormEvent<HTMLFormElement>){e.preventDefault();const name=String(new FormData(e.currentTarget).get('name'));const {data,error}=await supabase.rpc('create_group',{group_name:name});if(error)setMessage(error.message);else setInvite(data[0].invite_code);}async function join(e:FormEvent<HTMLFormElement>){e.preventDefault();const code=String(new FormData(e.currentTarget).get('code')).trim();const {error}=await supabase.rpc('join_group_by_code',{code});setMessage(error?error.message:'그룹에 가입했습니다.');}return <main><form onSubmit={create}><label>그룹 이름<input name="name" required/></label><button>그룹 생성</button></form>{invite&&<output>초대코드: {invite}</output>}<form onSubmit={join}><label>초대코드<input name="code" required/></label><button>그룹 가입</button></form>{message&&<p role="status">{message}</p>}</main>;}
+export default function GroupsPage() {
+  const [invite, setInvite] = useState('');
+  const [message, setMessage] = useState('');
+  async function create(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const name = String(new FormData(e.currentTarget).get('name'));
+    const { data, error } = await supabase.rpc('create_group', {
+      group_name: name,
+    });
+    if (error) setMessage(error.message);
+    else setInvite(data[0].invite_code);
+  }
+  async function join(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const code = String(new FormData(e.currentTarget).get('code')).trim();
+    const { error } = await supabase.rpc('join_group_by_code', { code });
+    setMessage(error ? error.message : '그룹에 가입했습니다.');
+  }
+  return (
+    <main>
+      <form onSubmit={create}>
+        <label>
+          그룹 이름
+          <input name="name" required />
+        </label>
+        <button>그룹 생성</button>
+      </form>
+      {invite && <output>초대코드: {invite}</output>}
+      <form onSubmit={join}>
+        <label>
+          초대코드
+          <input name="code" required />
+        </label>
+        <button>그룹 가입</button>
+      </form>
+      {message && <p role="status">{message}</p>}
+    </main>
+  );
+}
 ```
 
 - [ ] **Step 4: 생성→가입→멤버십을 확인합니다**
@@ -774,22 +1002,30 @@ git commit -m "feat: 초대코드 그룹 생성과 가입 UI 추가"
 ### Task 9: 지도·현재 위치·검색 반경
 
 **Files:**
+
 - Create: `components/Map.tsx`
 - Create: `components/Map.test.tsx`
 - Modify: `app/page.tsx`
 - Test: `components/Map.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `NEXT_PUBLIC_GOOGLE_MAPS_RENDER_KEY`, 브라우저 `navigator.geolocation`, Google Maps JavaScript API입니다.
 - Produces: `Map({onLocationChange:(location:{lat:number;lng:number;radius:500|1000})=>void})`와 500m/1km 반경 선택 UI입니다.
 
 - [ ] **Step 1: 반경 선택 실패 테스트를 작성합니다**
 
 ```tsx
-import { render,screen } from '@testing-library/react';
-import { describe,expect,it,vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import Map from './Map';
-describe('지도',()=>{it('두 검색 반경을 제공합니다',()=>{render(<Map onLocationChange={vi.fn()}/>);expect(screen.getByRole('option',{name:'500m'})).toBeInTheDocument();expect(screen.getByRole('option',{name:'1km'})).toBeInTheDocument();});});
+describe('지도', () => {
+  it('두 검색 반경을 제공합니다', () => {
+    render(<Map onLocationChange={vi.fn()} />);
+    expect(screen.getByRole('option', { name: '500m' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '1km' })).toBeInTheDocument();
+  });
+});
 ```
 
 - [ ] **Step 2: 지도 테스트 실패를 확인합니다**
@@ -802,9 +1038,44 @@ Expected: FAIL과 함께 `Failed to resolve import "./Map"`가 출력됩니다.
 
 ```tsx
 'use client';
-import { useEffect,useRef,useState } from 'react';
-type Location={lat:number;lng:number;radius:500|1000};
-export default function Map({onLocationChange}:{onLocationChange:(value:Location)=>void}){const node=useRef<HTMLDivElement>(null);const [radius,setRadius]=useState<500|1000>(500);const [error,setError]=useState('');useEffect(()=>{navigator.geolocation.getCurrentPosition(({coords})=>{const location={lat:coords.latitude,lng:coords.longitude,radius};onLocationChange(location);const map=new google.maps.Map(node.current!,{center:location,zoom:16});new google.maps.Marker({position:location,map});},()=>setError('현재 위치 권한이 필요합니다.'));},[radius,onLocationChange]);return <section><label>검색 반경<select value={radius} onChange={(e)=>setRadius(Number(e.target.value) as 500|1000)}><option value="500">500m</option><option value="1000">1km</option></select></label><div ref={node} aria-label="주변 지도" style={{height:400}}/>{error&&<p role="alert">{error}</p>}</section>;}
+import { useEffect, useRef, useState } from 'react';
+type Location = { lat: number; lng: number; radius: 500 | 1000 };
+export default function Map({ onLocationChange }: { onLocationChange: (value: Location) => void }) {
+  const node = useRef<HTMLDivElement>(null);
+  const [radius, setRadius] = useState<500 | 1000>(500);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const location = {
+          lat: coords.latitude,
+          lng: coords.longitude,
+          radius,
+        };
+        onLocationChange(location);
+        const map = new google.maps.Map(node.current!, {
+          center: location,
+          zoom: 16,
+        });
+        new google.maps.Marker({ position: location, map });
+      },
+      () => setError('현재 위치 권한이 필요합니다.'),
+    );
+  }, [radius, onLocationChange]);
+  return (
+    <section>
+      <label>
+        검색 반경
+        <select value={radius} onChange={(e) => setRadius(Number(e.target.value) as 500 | 1000)}>
+          <option value="500">500m</option>
+          <option value="1000">1km</option>
+        </select>
+      </label>
+      <div ref={node} aria-label="주변 지도" style={{ height: 400 }} />
+      {error && <p role="alert">{error}</p>}
+    </section>
+  );
+}
 ```
 
 Google Maps 스크립트는 `app/layout.tsx`의 `next/script`로 `NEXT_PUBLIC_GOOGLE_MAPS_RENDER_KEY`를 사용해 로드합니다. 이 키에는 Google Cloud Console에서 배포 도메인과 localhost HTTP referrer 제한을 적용합니다. `app/page.tsx`는 위치 상태를 보유하고 `Map`에 콜백을 전달합니다.
@@ -827,6 +1098,7 @@ git commit -m "feat: 현재 위치 지도와 검색 반경 선택 추가"
 ### Task 10: 추천 실행 플로우
 
 **Files:**
+
 - Create: `components/Recommend.tsx`
 - Create: `components/Recommend.test.tsx`
 - Create: `lib/mergeCandidates.ts`
@@ -836,15 +1108,41 @@ git commit -m "feat: 현재 위치 지도와 검색 반경 선택 추가"
 - Test: `lib/mergeCandidates.test.ts`
 
 **Interfaces:**
+
 - Consumes: `{lat:number;lng:number;radius:500|1000}`, `supabase.functions.invoke('nearby')`, RLS가 적용된 `ratings`/`category_prefs`, Task 4의 추천 함수입니다.
 - Produces: `mergeCandidates(restaurants: NearbyRestaurant[], ratings: RatingRow[], prefs: CategoryPrefRow[], currentUserId: string): {candidates:Candidate[]; categoryWeights:Record<string,number>}`와 `Recommend({location:Location|null})` 결과 카드입니다.
 
 - [ ] **Step 1: 그룹 평균 병합 실패 테스트를 작성합니다**
 
 ```ts
-import { describe,expect,it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { mergeCandidates } from './mergeCandidates';
-describe('후보 병합',()=>{it('개인 평점과 다른 그룹원의 평균을 분리합니다',()=>{const restaurants=[{placeId:'p1',name:'식당',category:'한식',lat:37,lng:127,googleRating:4,googleRatingsTotal:10,distanceMeters:50}];const ratings=[{user_id:'me',place_id:'p1',score:4,snoozed_until:null},{user_id:'other',place_id:'p1',score:2,snoozed_until:null}];const result=mergeCandidates(restaurants,ratings,[{category:'한식',weight:1.5}],'me');expect(result.candidates[0]).toMatchObject({personalRating:4,groupAverage:2});expect(result.categoryWeights).toEqual({'한식':1.5});});});
+describe('후보 병합', () => {
+  it('개인 평점과 다른 그룹원의 평균을 분리합니다', () => {
+    const restaurants = [
+      {
+        placeId: 'p1',
+        name: '식당',
+        category: '한식',
+        lat: 37,
+        lng: 127,
+        googleRating: 4,
+        googleRatingsTotal: 10,
+        distanceMeters: 50,
+      },
+    ];
+    const ratings = [
+      { user_id: 'me', place_id: 'p1', score: 4, snoozed_until: null },
+      { user_id: 'other', place_id: 'p1', score: 2, snoozed_until: null },
+    ];
+    const result = mergeCandidates(restaurants, ratings, [{ category: '한식', weight: 1.5 }], 'me');
+    expect(result.candidates[0]).toMatchObject({
+      personalRating: 4,
+      groupAverage: 2,
+    });
+    expect(result.categoryWeights).toEqual({ 한식: 1.5 });
+  });
+});
 ```
 
 - [ ] **Step 2: 병합 테스트 실패를 확인합니다**
@@ -857,16 +1155,91 @@ Expected: FAIL과 함께 `Failed to resolve import "./mergeCandidates"`가 출�
 
 ```ts
 import type { Candidate } from './recommend';
-export function mergeCandidates(restaurants:any[],ratings:any[],prefs:any[],currentUserId:string){const candidates:Candidate[]=restaurants.map((restaurant)=>{const rows=ratings.filter((rating)=>rating.place_id===restaurant.placeId);const mine=rows.find((rating)=>rating.user_id===currentUserId);const group=rows.filter((rating)=>rating.user_id!==currentUserId&&rating.score>0);return {...restaurant,personalRating:mine?.score??null,snoozedUntil:mine?.snoozed_until??null,groupAverage:group.length?group.reduce((sum,rating)=>sum+rating.score,0)/group.length:null};});return {candidates,categoryWeights:Object.fromEntries(prefs.map((pref)=>[pref.category,Number(pref.weight)]))};}
+export function mergeCandidates(
+  restaurants: any[],
+  ratings: any[],
+  prefs: any[],
+  currentUserId: string,
+) {
+  const candidates: Candidate[] = restaurants.map((restaurant) => {
+    const rows = ratings.filter((rating) => rating.place_id === restaurant.placeId);
+    const mine = rows.find((rating) => rating.user_id === currentUserId);
+    const group = rows.filter((rating) => rating.user_id !== currentUserId && rating.score > 0);
+    return {
+      ...restaurant,
+      personalRating: mine?.score ?? null,
+      snoozedUntil: mine?.snoozed_until ?? null,
+      groupAverage: group.length
+        ? group.reduce((sum, rating) => sum + rating.score, 0) / group.length
+        : null,
+    };
+  });
+  return {
+    candidates,
+    categoryWeights: Object.fromEntries(prefs.map((pref) => [pref.category, Number(pref.weight)])),
+  };
+}
 ```
 
 ```tsx
 'use client';
 import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { filterCandidates,pickWeightedRandom,scoreCandidate } from '../lib/recommend';
+import { filterCandidates, pickWeightedRandom, scoreCandidate } from '../lib/recommend';
 import { mergeCandidates } from '../lib/mergeCandidates';
-export default function Recommend({location}:{location:{lat:number;lng:number;radius:500|1000}|null}){const [result,setResult]=useState<any>(null);const [error,setError]=useState('');async function run(){if(!location)return;const {data:{user}}=await supabase.auth.getUser();if(!user)return setError('로그인이 필요합니다.');const nearby=await supabase.functions.invoke('nearby',{body:location});if(nearby.error)return setError(nearby.error.message);const [ratings,prefs]=await Promise.all([supabase.from('ratings').select('user_id,place_id,score,snoozed_until'),supabase.from('category_prefs').select('category,weight')]);const merged=mergeCandidates(nearby.data.restaurants,ratings.data??[],prefs.data??[],user.id);const candidates=filterCandidates(merged.candidates,new Date()).map((candidate)=>({...candidate,weight:scoreCandidate(candidate,{categoryWeights:merged.categoryWeights,maxDistanceMeters:location.radius})}));setResult(pickWeightedRandom(candidates,Math.random));}return <section><button onClick={run} disabled={!location}>한 곳 추천</button>{result&&<article><h2>{result.name}</h2><p>{result.category} · {Math.round(result.distanceMeters)}m</p></article>}{error&&<p role="alert">{error}</p>}</section>;}
+export default function Recommend({
+  location,
+}: {
+  location: { lat: number; lng: number; radius: 500 | 1000 } | null;
+}) {
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState('');
+  async function run() {
+    if (!location) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return setError('로그인이 필요합니다.');
+    const nearby = await supabase.functions.invoke('nearby', {
+      body: location,
+    });
+    if (nearby.error) return setError(nearby.error.message);
+    const [ratings, prefs] = await Promise.all([
+      supabase.from('ratings').select('user_id,place_id,score,snoozed_until'),
+      supabase.from('category_prefs').select('category,weight'),
+    ]);
+    const merged = mergeCandidates(
+      nearby.data.restaurants,
+      ratings.data ?? [],
+      prefs.data ?? [],
+      user.id,
+    );
+    const candidates = filterCandidates(merged.candidates, new Date()).map((candidate) => ({
+      ...candidate,
+      weight: scoreCandidate(candidate, {
+        categoryWeights: merged.categoryWeights,
+        maxDistanceMeters: location.radius,
+      }),
+    }));
+    setResult(pickWeightedRandom(candidates, Math.random));
+  }
+  return (
+    <section>
+      <button onClick={run} disabled={!location}>
+        한 곳 추천
+      </button>
+      {result && (
+        <article>
+          <h2>{result.name}</h2>
+          <p>
+            {result.category} · {Math.round(result.distanceMeters)}m
+          </p>
+        </article>
+      )}
+      {error && <p role="alert">{error}</p>}
+    </section>
+  );
+}
 ```
 
 `app/page.tsx`에서 Task 9의 위치 상태를 `Map`과 `Recommend`에 연결합니다.
@@ -889,6 +1262,7 @@ git commit -m "feat: 그룹 평점을 병합한 추천 실행 플로우 추가"
 ### Task 11: 평점·기호·스누즈 UI
 
 **Files:**
+
 - Create: `components/RatingControls.tsx`
 - Create: `components/RatingControls.test.tsx`
 - Create: `components/CategoryPrefs.tsx`
@@ -901,15 +1275,22 @@ git commit -m "feat: 그룹 평점을 병합한 추천 실행 플로우 추가"
 - Test: `lib/snooze.test.ts`
 
 **Interfaces:**
+
 - Consumes: 추천 결과 `placeId`/`category`, 현재 사용자 ID, `ratings`와 `category_prefs` 본인 쓰기 RLS입니다.
 - Produces: `snoozedUntilOneWeekFrom(now: Date): string`, `RatingControls({placeId,userId})`, `CategoryPrefs({userId,categories})`입니다.
 
 - [ ] **Step 1: 7일 스누즈 계산 실패 테스트를 작성합니다**
 
 ```ts
-import { describe,expect,it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { snoozedUntilOneWeekFrom } from './snooze';
-describe('스누즈',()=>{it('현재 시각에서 정확히 7일 뒤를 반환합니다',()=>{expect(snoozedUntilOneWeekFrom(new Date('2026-07-21T03:00:00Z'))).toBe('2026-07-28T03:00:00.000Z');});});
+describe('스누즈', () => {
+  it('현재 시각에서 정확히 7일 뒤를 반환합니다', () => {
+    expect(snoozedUntilOneWeekFrom(new Date('2026-07-21T03:00:00Z'))).toBe(
+      '2026-07-28T03:00:00.000Z',
+    );
+  });
+});
 ```
 
 - [ ] **Step 2: 스누즈 테스트 실패를 확인합니다**
@@ -921,14 +1302,49 @@ Expected: FAIL과 함께 `Failed to resolve import "./snooze"`가 출력됩니�
 - [ ] **Step 3: 저장 컨트롤과 스누즈 함수를 구현합니다**
 
 ```ts
-export function snoozedUntilOneWeekFrom(now:Date):string{return new Date(now.getTime()+7*24*60*60*1000).toISOString();}
+export function snoozedUntilOneWeekFrom(now: Date): string {
+  return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+}
 ```
 
 ```tsx
 'use client';
 import { supabase } from '../lib/supabaseClient';
 import { snoozedUntilOneWeekFrom } from '../lib/snooze';
-export default function RatingControls({placeId,userId}:{placeId:string;userId:string}){async function save(score:number){await supabase.from('ratings').upsert({user_id:userId,place_id:placeId,score},{onConflict:'user_id,place_id'});}async function snooze(){const {data}=await supabase.from('ratings').select('score').eq('user_id',userId).eq('place_id',placeId).maybeSingle();await supabase.from('ratings').upsert({user_id:userId,place_id:placeId,score:data?.score??3,snoozed_until:snoozedUntilOneWeekFrom(new Date())},{onConflict:'user_id,place_id'});}return <section aria-label="개인 평점">{[0,1,2,3,4,5].map((score)=><button key={score} onClick={()=>save(score)}>{score}점</button>)}<button onClick={snooze}>1주간 그만 보기</button></section>;}
+export default function RatingControls({ placeId, userId }: { placeId: string; userId: string }) {
+  async function save(score: number) {
+    await supabase
+      .from('ratings')
+      .upsert({ user_id: userId, place_id: placeId, score }, { onConflict: 'user_id,place_id' });
+  }
+  async function snooze() {
+    const { data } = await supabase
+      .from('ratings')
+      .select('score')
+      .eq('user_id', userId)
+      .eq('place_id', placeId)
+      .maybeSingle();
+    await supabase.from('ratings').upsert(
+      {
+        user_id: userId,
+        place_id: placeId,
+        score: data?.score ?? 3,
+        snoozed_until: snoozedUntilOneWeekFrom(new Date()),
+      },
+      { onConflict: 'user_id,place_id' },
+    );
+  }
+  return (
+    <section aria-label="개인 평점">
+      {[0, 1, 2, 3, 4, 5].map((score) => (
+        <button key={score} onClick={() => save(score)}>
+          {score}점
+        </button>
+      ))}
+      <button onClick={snooze}>1주간 그만 보기</button>
+    </section>
+  );
+}
 ```
 
 `RatingControls`는 기존 평점 행을 먼저 조회하여 스누즈 upsert 시 `score`를 보존합니다. 행이 없을 때만 중립 기준인 3점을 사용합니다. 0점 저장은 `snoozed_until`을 변경하지 않아 영구 제외와 일시 스누즈를 독립적으로 유지합니다.
@@ -936,7 +1352,40 @@ export default function RatingControls({placeId,userId}:{placeId:string;userId:s
 ```tsx
 'use client';
 import { supabase } from '../lib/supabaseClient';
-export default function CategoryPrefs({userId,categories}:{userId:string;categories:string[]}){return <section aria-label="카테고리 기호">{categories.map((category)=><label key={category}>{category}<input type="number" min="0.1" max="3" step="0.1" defaultValue="1" onBlur={(event)=>supabase.from('category_prefs').upsert({user_id:userId,category,weight:Number(event.currentTarget.value)},{onConflict:'user_id,category'})}/></label>)}</section>;}
+export default function CategoryPrefs({
+  userId,
+  categories,
+}: {
+  userId: string;
+  categories: string[];
+}) {
+  return (
+    <section aria-label="카테고리 기호">
+      {categories.map((category) => (
+        <label key={category}>
+          {category}
+          <input
+            type="number"
+            min="0.1"
+            max="3"
+            step="0.1"
+            defaultValue="1"
+            onBlur={(event) =>
+              supabase.from('category_prefs').upsert(
+                {
+                  user_id: userId,
+                  category,
+                  weight: Number(event.currentTarget.value),
+                },
+                { onConflict: 'user_id,category' },
+              )
+            }
+          />
+        </label>
+      ))}
+    </section>
+  );
+}
 ```
 
 `Recommend.tsx` 결과 카드 아래에 로그인 사용자 ID를 전달한 `RatingControls`와 결과 카테고리를 전달한 `CategoryPrefs`를 렌더링합니다.
