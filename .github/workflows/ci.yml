@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  frontend:
+    name: 프론트 (Next.js / Vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: 테스트
+        run: npm test
+      - name: 타입체크
+        run: npm run typecheck
+      - name: 린트
+        run: npm run lint
+      - name: 빌드
+        run: npm run build
+        # NEXT_PUBLIC_ 값이 없으면 prerender가 깨지므로 CI 빌드용 더미 값 주입
+        # (실제 값은 Vercel 환경변수에서 주입되며, 여기서는 빌드 통과만 검증)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key-for-ci-build
+          NEXT_PUBLIC_GOOGLE_MAPS_KEY: dummy-maps-key-for-ci-build
+
+  edge-functions:
+    name: Edge Function (Deno)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      # index.ts가 Deno 전역(Deno.serve 등)을 쓰므로 타입체크는 건너뛰고 런타임 테스트만 수행.
+      # @supabase/supabase-js의 npm 전이 의존을 CI에서 자동 설치하도록 --node-modules-dir=auto 지정.
+      - name: Deno 테스트
+        run: deno test --no-check --allow-env --node-modules-dir=auto supabase/functions/
