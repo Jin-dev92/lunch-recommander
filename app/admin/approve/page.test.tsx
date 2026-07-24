@@ -20,7 +20,10 @@ describe('관리자 회원가입 승인', () => {
   });
 
   it('요청 이메일과 상태를 표시합니다', async () => {
-    invoke.mockResolvedValue({ data: { email: 'guest@example.com', status: 'pending' }, error: null });
+    invoke.mockResolvedValue({
+      data: { email: 'guest@example.com', status: 'pending' },
+      error: null,
+    });
 
     render(<ApprovePage />);
 
@@ -45,7 +48,10 @@ describe('관리자 회원가입 승인', () => {
     ['거절', 'reject', '거절 완료'],
   ])('%s 버튼이 결과를 표시하고 재제출을 막습니다', async (button, action, result) => {
     invoke
-      .mockResolvedValueOnce({ data: { email: 'guest@example.com', status: 'pending' }, error: null })
+      .mockResolvedValueOnce({
+        data: { email: 'guest@example.com', status: 'pending' },
+        error: null,
+      })
       .mockResolvedValueOnce({
         data: { status: action === 'approve' ? 'approved' : 'rejected' },
         error: null,

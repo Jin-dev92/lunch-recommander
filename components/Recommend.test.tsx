@@ -191,9 +191,27 @@ describe('추천 실행', () => {
   it('선택한 Google 평점과 리뷰 수 기준을 모두 만족하는 후보만 추천합니다', async () => {
     post.mockResolvedValue(
       mockNearby([
-        { ...restaurant, placeId: 'low-rating', name: '평점 미달', googleRating: 4.4, googleRatingsTotal: 50 },
-        { ...restaurant, placeId: 'low-reviews', name: '리뷰 미달', googleRating: 4.5, googleRatingsTotal: 49 },
-        { ...restaurant, placeId: 'qualified', name: '조건 충족', googleRating: 4.5, googleRatingsTotal: 50 },
+        {
+          ...restaurant,
+          placeId: 'low-rating',
+          name: '평점 미달',
+          googleRating: 4.4,
+          googleRatingsTotal: 50,
+        },
+        {
+          ...restaurant,
+          placeId: 'low-reviews',
+          name: '리뷰 미달',
+          googleRating: 4.5,
+          googleRatingsTotal: 49,
+        },
+        {
+          ...restaurant,
+          placeId: 'qualified',
+          name: '조건 충족',
+          googleRating: 4.5,
+          googleRatingsTotal: 50,
+        },
       ]),
     );
     mockTables();

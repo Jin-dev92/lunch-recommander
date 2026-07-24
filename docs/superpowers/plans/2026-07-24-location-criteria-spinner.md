@@ -24,11 +24,13 @@
 ### Task 1: 추천 조건 타입과 후보 필터
 
 **Files:**
+
 - Modify: `lib/types/api/recommend.types.ts`
 - Modify: `lib/recommend.ts`
 - Test: `lib/recommend.test.ts`
 
 **Interfaces:**
+
 - Produces: `RecommendationCriteria` 타입
 - Produces: `DEFAULT_RECOMMENDATION_CRITERIA` 상수
 - Changes: `filterCandidates<T extends Candidate>(candidates, now, criteria): T[]`
@@ -84,7 +86,7 @@ export const DEFAULT_RECOMMENDATION_CRITERIA: RecommendationCriteria = {
 ```ts
 c.googleRating !== null &&
   c.googleRating >= criteria.minGoogleRating &&
-  c.googleRatingsTotal >= criteria.minGoogleReviews
+  c.googleRatingsTotal >= criteria.minGoogleReviews;
 ```
 
 - [ ] **Step 4: 단위 테스트 통과 확인**
@@ -103,6 +105,7 @@ git commit -m "feat: Google 평점과 리뷰 수 추천 조건 추가"
 ### Task 2: 검색 조건 UI와 위치 권한 재요청
 
 **Files:**
+
 - Modify: `components/Map.tsx`
 - Modify: `components/Map.module.css`
 - Test: `components/Map.test.tsx`
@@ -111,6 +114,7 @@ git commit -m "feat: Google 평점과 리뷰 수 추천 조건 추가"
 - Test: `app/page.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `RecommendationCriteria`, `DEFAULT_RECOMMENDATION_CRITERIA`
 - Produces: `Map` prop `onCriteriaChange(value: RecommendationCriteria): void`
 - Produces: `Recommend` prop `criteria: RecommendationCriteria`
@@ -136,9 +140,7 @@ expect(screen.getByLabelText('최소 리뷰 수')).toHaveValue('30');
 const getCurrentPosition = vi
   .fn()
   .mockImplementationOnce((_success, error) => error())
-  .mockImplementationOnce((success) =>
-    success({ coords: { latitude: 37.5, longitude: 127 } }),
-  );
+  .mockImplementationOnce((success) => success({ coords: { latitude: 37.5, longitude: 127 } }));
 ```
 
 `현재 위치 권한이 필요합니다.` 버튼 클릭 후 두 번째 호출, 위치 콜백, 경고 제거를 검증한다. `navigator.permissions.query`가 `{ state: 'denied' }`를 반환하거나 재요청이 실패하면 `브라우저 설정에서 위치 권한을 허용해 주세요.`가 표시되는 테스트도 추가한다.
@@ -186,10 +188,12 @@ git commit -m "feat: 위치 재요청과 검색 조건 UI 추가"
 ### Task 3: 추천 실행에 품질 기준 연결
 
 **Files:**
+
 - Modify: `components/Recommend.tsx`
 - Test: `components/Recommend.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `RecommendationCriteria`
 - Changes: `Recommend` props에 `criteria: RecommendationCriteria` 추가
 - Consumes: Task 1의 `filterCandidates(candidates, now, criteria)`
@@ -234,10 +238,12 @@ git commit -m "feat: 추천 후보에 사용자 품질 기준 적용"
 ### Task 4: Edge Function 검색 반경 확장
 
 **Files:**
+
 - Modify: `supabase/functions/nearby/index.ts`
 - Test: `supabase/functions/nearby/index.test.ts`
 
 **Interfaces:**
+
 - Changes: `nearby` 요청 허용 반경을 `[100, 300, 500, 1000]`으로 확장
 - Preserves: JWT 인증과 사용자 ID + IP rate limit 선행 실행
 
@@ -256,7 +262,7 @@ Expected: 100과 300 요청이 400으로 FAIL
 `supabase/functions/nearby/index.ts`의 서버 측 검증을 다음과 같이 바꾼다.
 
 ```ts
-![100, 300, 500, 1000].includes(body.radius)
+![100, 300, 500, 1000].includes(body.radius);
 ```
 
 rate limit과 외부 API 어댑터는 수정하지 않는다.
@@ -277,6 +283,7 @@ git commit -m "feat: 주변 검색 반경에 100m와 300m 추가"
 ### Task 5: 공통 Spinner와 핵심 추천 UI 적용
 
 **Files:**
+
 - Create: `components/Spinner.tsx`
 - Create: `components/Spinner.module.css`
 - Create: `components/Spinner.test.tsx`
@@ -288,6 +295,7 @@ git commit -m "feat: 주변 검색 반경에 100m와 300m 추가"
 - Test: `components/Map.test.tsx`
 
 **Interfaces:**
+
 - Produces: `Spinner({ className?: string }): JSX.Element`
 - Consumes: `isFetching`, 위치 요청 pending 상태
 
@@ -339,6 +347,7 @@ git commit -m "feat: 공통 스피너를 추천과 위치 요청에 적용"
 ### Task 6: 나머지 비동기 UI에 공통 스피너 적용
 
 **Files:**
+
 - Modify: `app/page.tsx`
 - Modify: `app/page.module.css`
 - Modify: `app/page.test.tsx`
@@ -360,6 +369,7 @@ git commit -m "feat: 공통 스피너를 추천과 위치 요청에 적용"
 - Modify: `components/CategoryPrefs.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `Spinner`
 - Preserves: 각 mutation의 기존 disabled 및 오류 처리
 
@@ -406,9 +416,11 @@ git commit -m "feat: 비동기 UI에 공통 스피너 적용"
 ### Task 7: 문서와 전체 검증
 
 **Files:**
+
 - Modify: `README.md`
 
 **Interfaces:**
+
 - Documents: 최종 검색 반경, 품질 조건, 위치 권한 재요청, 공통 스피너
 
 - [ ] **Step 1: README 기능 설명 갱신**

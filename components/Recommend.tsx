@@ -60,13 +60,15 @@ export default function Recommend({
     setUserId(data.userId);
     const merged = mergeCandidates(data.restaurants, data.ratings, data.prefs, data.userId);
     setCategoryWeights(merged.categoryWeights);
-    const candidates = filterCandidates(merged.candidates, new Date(), criteria).map((candidate) => ({
-      ...candidate,
-      weight: scoreCandidate(candidate, {
-        categoryWeights: merged.categoryWeights,
-        maxDistanceMeters: location.radius,
+    const candidates = filterCandidates(merged.candidates, new Date(), criteria).map(
+      (candidate) => ({
+        ...candidate,
+        weight: scoreCandidate(candidate, {
+          categoryWeights: merged.categoryWeights,
+          maxDistanceMeters: location.radius,
+        }),
       }),
-    }));
+    );
     const picked = pickWeightedRandom(candidates, Math.random);
     if (!picked) return setError(MESSAGES.NO_CANDIDATES);
     setResult(picked);

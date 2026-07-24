@@ -19,9 +19,7 @@ import styles from './page.module.css';
 
 export default function HomePage() {
   const [searchLocation, setSearchLocation] = useState<SearchLocation | null>(null);
-  const [criteria, setCriteria] = useState<RecommendationCriteria>(
-    DEFAULT_RECOMMENDATION_CRITERIA,
-  );
+  const [criteria, setCriteria] = useState<RecommendationCriteria>(DEFAULT_RECOMMENDATION_CRITERIA);
   const { isLoggedIn } = useAuth();
   const signOut = useSignOut();
 

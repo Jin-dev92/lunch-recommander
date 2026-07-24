@@ -46,7 +46,11 @@ function ApproveInner() {
       return;
     }
     setMessage(
-      data?.alreadyRegistered ? '이미 가입된 사용자입니다.' : action === 'approve' ? '승인 완료' : '거절 완료',
+      data?.alreadyRegistered
+        ? '이미 가입된 사용자입니다.'
+        : action === 'approve'
+          ? '승인 완료'
+          : '거절 완료',
     );
     setDone(true);
     setSubmitting(false);

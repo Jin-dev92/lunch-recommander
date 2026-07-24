@@ -72,9 +72,7 @@ describe('지도', () => {
     expect(screen.getByRole('option', { name: '1km' })).toBeInTheDocument();
     expect(screen.getByLabelText('최소 평점')).toHaveValue('3.5');
     expect(screen.getByLabelText('최소 리뷰 수')).toHaveValue('30');
-    expect(
-      screen.getByRole('option', { name: '평점 5.0 이상' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '평점 5.0 이상' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '리뷰 100개 이상' })).toBeInTheDocument();
     expect(screen.getByLabelText('주변 지도')).not.toHaveAttribute('style');
   });
