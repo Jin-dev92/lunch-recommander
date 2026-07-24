@@ -1,3 +1,5 @@
+import type { RecommendationCriteria } from './types/api';
+
 export type Candidate = {
   placeId: string;
   category: string;
@@ -23,9 +25,18 @@ const EXPONENTS = {
 } as const;
 
 // 제네릭이라 name 등 확장 필드를 붙인 후보를 넣어도 타입이 그대로 보존된다(호출부 캐스트 불필요).
-export function filterCandidates<T extends Candidate>(candidates: T[], now: Date): T[] {
+export function filterCandidates<T extends Candidate>(
+  candidates: T[],
+  now: Date,
+  criteria: RecommendationCriteria,
+): T[] {
   return candidates.filter(
-    (c) => c.personalRating !== 0 && (!c.snoozedUntil || new Date(c.snoozedUntil) <= now),
+    (c) =>
+      c.personalRating !== 0 &&
+      (!c.snoozedUntil || new Date(c.snoozedUntil) <= now) &&
+      c.googleRating !== null &&
+      c.googleRating >= criteria.minGoogleRating &&
+      c.googleRatingsTotal >= criteria.minGoogleReviews,
   );
 }
 

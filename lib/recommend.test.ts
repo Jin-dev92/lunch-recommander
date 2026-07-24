@@ -11,6 +11,7 @@ const base: Candidate = {
   groupAverage: null,
   snoozedUntil: null,
 };
+const criteria = { minGoogleRating: 3.5 as const, minGoogleReviews: 30 as const };
 
 describe('추천', () => {
   it('0점과 미래 스누즈를 제외하고 지난 스누즈를 포함합니다', () => {
@@ -20,7 +21,18 @@ describe('추천', () => {
       { ...base, placeId: 'future', snoozedUntil: '2026-07-22T03:00:00Z' },
       { ...base, placeId: 'past', snoozedUntil: '2026-07-20T03:00:00Z' },
     ];
-    expect(filterCandidates(candidates, now).map((x) => x.placeId)).toEqual(['past']);
+    expect(filterCandidates(candidates, now, criteria).map((x) => x.placeId)).toEqual(['past']);
+  });
+  it('Google 평점과 리뷰 수가 최소 기준 이상인 후보만 포함합니다', () => {
+    const candidates = [
+      { ...base, placeId: 'boundary', googleRating: 3.5, googleRatingsTotal: 30 },
+      { ...base, placeId: 'low-rating', googleRating: 3.49, googleRatingsTotal: 30 },
+      { ...base, placeId: 'low-reviews', googleRating: 4, googleRatingsTotal: 29 },
+      { ...base, placeId: 'missing-rating', googleRating: null, googleRatingsTotal: 100 },
+    ];
+    expect(filterCandidates(candidates, new Date(), criteria).map((x) => x.placeId)).toEqual([
+      'boundary',
+    ]);
   });
   it('결측 평점을 중립값으로 계산합니다', () => {
     expect(scoreCandidate(base, { categoryWeights: {}, maxDistanceMeters: 1000 })).toBeGreaterThan(
