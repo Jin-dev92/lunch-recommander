@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { useSaveCategoryPref } from '../lib/hooks/mutations';
+import { MESSAGES } from '../lib/messages';
 
 export default function CategoryPrefs({
   userId,
@@ -11,15 +11,7 @@ export default function CategoryPrefs({
   categories: string[];
   currentWeights?: Record<string, number>;
 }) {
-  const [error, setError] = useState('');
-
-  async function save(category: string, weight: number) {
-    setError('');
-    const { error: saveError } = await supabase
-      .from('category_prefs')
-      .upsert({ user_id: userId, category, weight }, { onConflict: 'user_id,category' });
-    if (saveError) setError('기호 저장에 실패했습니다.');
-  }
+  const saveCategoryPref = useSaveCategoryPref();
 
   return (
     <section aria-label="카테고리 기호">
@@ -32,11 +24,17 @@ export default function CategoryPrefs({
             max="3"
             step="0.1"
             defaultValue={currentWeights[category] ?? 1}
-            onBlur={(event) => save(category, Number(event.currentTarget.value))}
+            onBlur={(event) =>
+              saveCategoryPref.mutate({
+                userId,
+                category,
+                weight: Number(event.currentTarget.value),
+              })
+            }
           />
         </label>
       ))}
-      {error && <p role="alert">{error}</p>}
+      {saveCategoryPref.isError && <p role="alert">{MESSAGES.CATEGORY_PREF_SAVE_FAILED}</p>}
     </section>
   );
 }

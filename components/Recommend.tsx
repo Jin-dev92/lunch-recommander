@@ -1,56 +1,40 @@
 'use client';
 import { useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { useRecommendationData } from '../lib/hooks/queries';
+import { errorMessage, MESSAGES } from '../lib/messages';
+import { mergeCandidates } from '../lib/mergeCandidates';
 import {
   filterCandidates,
   pickWeightedRandom,
   scoreCandidate,
   type Candidate,
 } from '../lib/recommend';
-import { mergeCandidates } from '../lib/mergeCandidates';
+import type { SearchLocation } from '../lib/types/api';
 import RatingControls from './RatingControls';
 import CategoryPrefs from './CategoryPrefs';
 
-type Location = { lat: number; lng: number; radius: 500 | 1000 };
 type Result = Candidate & { name: string; weight: number };
 
-export default function Recommend({ location }: { location: Location | null }) {
+export default function Recommend({ location }: { location: SearchLocation | null }) {
   const [result, setResult] = useState<Result | null>(null);
   const [userId, setUserId] = useState('');
   const [error, setError] = useState('');
   const [categoryWeights, setCategoryWeights] = useState<Record<string, number>>({});
+  const { refetch, isFetching } = useRecommendationData(location);
 
+  // 추첨은 누를 때마다 결과가 달라져야 하므로 캐시된 data를 그대로 쓰지 않고 매번 refetch한다.
   async function run() {
     if (!location) return;
     setResult(null);
     setError('');
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return setError('로그인이 필요합니다.');
-    setUserId(user.id);
-    const nearby = await supabase.functions.invoke('nearby', {
-      body: location,
-    });
-    if (nearby.error) return setError(nearby.error.message);
-    const [ratings, prefs] = await Promise.all([
-      supabase.from('ratings').select('user_id,place_id,score,snoozed_until'),
-      supabase.from('category_prefs').select('category,weight'),
-    ]);
-    if (ratings.error) return setError(ratings.error.message);
-    if (prefs.error) return setError(prefs.error.message);
-    const merged = mergeCandidates(
-      nearby.data.restaurants,
-      ratings.data ?? [],
-      prefs.data ?? [],
-      user.id,
-    );
+    const { data, error: fetchError } = await refetch();
+    if (fetchError) return setError(errorMessage(fetchError));
+    if (!data) return setError(MESSAGES.NO_CANDIDATES);
+
+    setUserId(data.userId);
+    const merged = mergeCandidates(data.restaurants, data.ratings, data.prefs, data.userId);
     setCategoryWeights(merged.categoryWeights);
-    // filterCandidates는 Task 4의 Candidate 타입으로 반환하므로 이름 필드를 다시 붙여둔다
-    const filtered = filterCandidates(merged.candidates, new Date()) as (Candidate & {
-      name: string;
-    })[];
-    const candidates = filtered.map((candidate) => ({
+    const candidates = filterCandidates(merged.candidates, new Date()).map((candidate) => ({
       ...candidate,
       weight: scoreCandidate(candidate, {
         categoryWeights: merged.categoryWeights,
@@ -58,13 +42,13 @@ export default function Recommend({ location }: { location: Location | null }) {
       }),
     }));
     const picked = pickWeightedRandom(candidates, Math.random);
-    if (!picked) return setError('추천할 음식점이 없습니다.');
+    if (!picked) return setError(MESSAGES.NO_CANDIDATES);
     setResult(picked);
   }
 
   return (
     <section>
-      <button onClick={run} disabled={!location}>
+      <button onClick={run} disabled={!location || isFetching}>
         한 곳 추천
       </button>
       {result && (

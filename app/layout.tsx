@@ -1,11 +1,12 @@
 import Script from 'next/script';
+import Providers from './providers';
 import './globals.css';
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ko">
       <body>
-        {children}
+        <Providers>{children}</Providers>
         <Script
           src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}`}
           strategy="beforeInteractive"
