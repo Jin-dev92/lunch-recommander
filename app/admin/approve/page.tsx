@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import styles from '../../login/login.module.css';
+import Spinner from '../../../components/Spinner';
 
 type SignupRequest = {
   email: string;
@@ -57,7 +58,12 @@ function ApproveInner() {
         <h1 className={styles.title} id="approve-title">
           회원가입 요청 검토
         </h1>
-        {loading && <p className={styles.subtitle}>요청 정보를 확인하고 있습니다…</p>}
+        {loading && (
+          <p className={styles.loadingStatus} role="status">
+            <Spinner />
+            요청 정보를 확인하고 있습니다…
+          </p>
+        )}
         {request && (
           <div className={styles.form}>
             <p>
@@ -68,6 +74,12 @@ function ApproveInner() {
             </p>
             {!done && (
               <>
+                {submitting && (
+                  <p className={styles.loadingStatus} role="status">
+                    <Spinner />
+                    처리 중…
+                  </p>
+                )}
                 <button
                   className={styles.button}
                   type="button"

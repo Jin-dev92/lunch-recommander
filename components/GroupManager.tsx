@@ -5,6 +5,7 @@ import { useCreateGroup, useJoinGroup } from '../lib/hooks/mutations';
 import { errorMessage, MESSAGES } from '../lib/messages';
 import type { CreateGroupRequest, JoinGroupRequest } from '../lib/types/api';
 import styles from './GroupManager.module.css';
+import Spinner from './Spinner';
 
 /**
  * 그룹 생성·가입을 모달에서 처리한다. 별도 페이지 대신 홈에서 바로 연다.
@@ -65,8 +66,19 @@ export default function GroupManager() {
               {...createForm.register('name', { required: true })}
             />
           </label>
-          <button className={styles.submit} disabled={createGroup.isPending}>
-            그룹 생성
+          <button
+            className={styles.submit}
+            disabled={createGroup.isPending}
+            aria-busy={createGroup.isPending}
+          >
+            {createGroup.isPending ? (
+              <>
+                <Spinner />
+                생성 중…
+              </>
+            ) : (
+              '그룹 생성'
+            )}
           </button>
         </form>
         {createGroup.isSuccess && (
@@ -84,8 +96,19 @@ export default function GroupManager() {
               {...joinForm.register('code', { required: true })}
             />
           </label>
-          <button className={styles.submit} disabled={joinGroup.isPending}>
-            그룹 가입
+          <button
+            className={styles.submit}
+            disabled={joinGroup.isPending}
+            aria-busy={joinGroup.isPending}
+          >
+            {joinGroup.isPending ? (
+              <>
+                <Spinner />
+                가입 중…
+              </>
+            ) : (
+              '그룹 가입'
+            )}
           </button>
         </form>
         {joinGroup.isSuccess && (

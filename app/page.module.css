@@ -29,6 +29,10 @@
 }
 
 .secondaryAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-height: 44px;
   padding: 0 11px;
   display: inline-flex;

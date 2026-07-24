@@ -31,6 +31,15 @@ describe('관리자 회원가입 승인', () => {
     });
   });
 
+  it('요청 정보를 불러오는 동안 공통 스피너를 보여줍니다', async () => {
+    invoke.mockReturnValue(new Promise(() => {}));
+
+    render(<ApprovePage />);
+
+    expect(await screen.findByRole('status')).toHaveTextContent('요청 정보를 확인하고 있습니다…');
+    expect(screen.getByTestId('spinner')).toBeInTheDocument();
+  });
+
   it.each([
     ['승인', 'approve', '승인 완료'],
     ['거절', 'reject', '거절 완료'],

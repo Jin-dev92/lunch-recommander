@@ -68,6 +68,17 @@ describe('홈 헤더', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('로그아웃 요청 중 공통 스피너를 보여줍니다', async () => {
+    mockUser(false);
+    signOut.mockReturnValue(new Promise(() => {}));
+    renderWithQuery(<HomePage />);
+    fireEvent.click(await screen.findByRole('button', { name: '로그아웃' }));
+
+    const button = await screen.findByRole('button', { name: '로그아웃 중…' });
+    expect(button).toBeDisabled();
+    expect(screen.getByTestId('spinner')).toBeInTheDocument();
+  });
+
   it('로그아웃 실패 시 에러 메시지를 보여줍니다', async () => {
     mockUser(false);
     signOut.mockResolvedValue({ error: { message: '로그아웃 실패' } });

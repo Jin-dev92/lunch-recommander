@@ -4,6 +4,7 @@ import Link from 'next/link';
 import GroupManager from '../components/GroupManager';
 import Map from '../components/Map';
 import Recommend from '../components/Recommend';
+import Spinner from '../components/Spinner';
 import { ROUTES } from '../lib/constants';
 import { ensureSession } from '../lib/api';
 import { useAuth } from '../lib/hooks/useAuth';
@@ -41,7 +42,14 @@ export default function HomePage() {
                 onClick={logout}
                 disabled={signOut.isPending}
               >
-                로그아웃
+                {signOut.isPending ? (
+                  <>
+                    <Spinner />
+                    로그아웃 중…
+                  </>
+                ) : (
+                  '로그아웃'
+                )}
               </button>
             </>
           ) : (

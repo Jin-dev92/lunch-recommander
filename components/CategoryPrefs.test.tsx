@@ -79,4 +79,16 @@ describe('카테고리 기호 저장', () => {
     fireEvent.click(screen.getByRole('radio', { name: '좋아요' }));
     await screen.findByRole('alert');
   });
+
+  it('선호 저장 중 컨트롤 영역에 공통 스피너를 한 번 보여줍니다', async () => {
+    const upsert = vi.fn().mockReturnValue(new Promise(() => {}));
+    from.mockImplementation(() => ({ upsert }));
+    render();
+
+    fireEvent.click(screen.getByRole('radio', { name: '좋아요' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('저장 중…');
+    expect(screen.getAllByTestId('spinner')).toHaveLength(1);
+    expect(screen.getByLabelText('카테고리 기호')).toHaveAttribute('aria-busy', 'true');
+  });
 });

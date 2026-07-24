@@ -50,6 +50,18 @@ describe('그룹 관리 모달', () => {
     expect(rpc).toHaveBeenCalledWith('create_group', { group_name: '점심팀' });
   });
 
+  it('그룹 생성 중 실행한 버튼에 공통 스피너를 보여줍니다', async () => {
+    rpc.mockReturnValue(new Promise(() => {}));
+    open();
+    fireEvent.change(screen.getByLabelText('그룹 이름'), { target: { value: '점심팀' } });
+    createGroupSubmit();
+
+    const button = await screen.findByRole('button', { name: '생성 중…' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByTestId('spinner')).toBeInTheDocument();
+  });
+
   it('초대코드 가입 성공 시 안내 메시지를 표시합니다', async () => {
     rpc.mockResolvedValue({ error: null });
     open();

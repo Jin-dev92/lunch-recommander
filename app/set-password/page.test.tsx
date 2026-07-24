@@ -150,7 +150,9 @@ describe('비밀번호 설정', () => {
       target: { value: 'strong-password-1' },
     });
     fireEvent.click(screen.getByRole('button', { name: '비밀번호 설정' }));
-    expect(await screen.findByRole('button', { name: '설정 중…' })).toBeDisabled();
+    const pendingButton = await screen.findByRole('button', { name: '설정 중…' });
+    expect(pendingButton).toBeDisabled();
+    expect(screen.getByTestId('spinner')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '설정 중…' }));
     expect(updateUser).toHaveBeenCalledTimes(1);
     resolveUpdate!({ error: null });

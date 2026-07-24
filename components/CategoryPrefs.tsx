@@ -4,6 +4,7 @@ import { CATEGORY_PREFERENCE_OPTIONS, DEFAULT_CATEGORY_WEIGHT } from '../lib/con
 import { useSaveCategoryPref } from '../lib/hooks/mutations';
 import { MESSAGES } from '../lib/messages';
 import styles from './CategoryPrefs.module.css';
+import Spinner from './Spinner';
 
 /**
  * 카테고리 선호도를 3단계로 받는다. 숫자를 직접 입력받던 방식은 값의 의미가 드러나지 않았다.
@@ -35,6 +36,12 @@ export default function CategoryPrefs({
       aria-label="카테고리 기호"
       aria-busy={saveCategoryPref.isPending}
     >
+      {saveCategoryPref.isPending && (
+        <p className={styles.pendingStatus} role="status">
+          <Spinner />
+          저장 중…
+        </p>
+      )}
       <fieldset className={styles.fieldset}>
         <legend className={styles.legend}>{categoryLabel}, 얼마나 좋아하세요?</legend>
         <div className={styles.options}>

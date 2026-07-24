@@ -70,6 +70,17 @@ describe('로그인', () => {
     expect(assign).not.toHaveBeenCalled();
   });
 
+  it('로그인 요청 중 공통 스피너를 보여줍니다', async () => {
+    signInWithPassword.mockReturnValue(new Promise(() => {}));
+    renderWithQuery(<LoginPage />);
+    fillAndSubmit();
+
+    const button = await screen.findByRole('button', { name: '로그인 중…' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByTestId('spinner')).toBeInTheDocument();
+  });
+
   it('회원가입 요청 폼은 모달을 열기 전에는 보이지 않습니다', () => {
     renderWithQuery(<LoginPage />);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -124,6 +135,16 @@ describe('회원가입 요청 모달', () => {
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('요청 한도를 초과했습니다.'),
     );
+  });
+
+  it('회원가입 요청 중 공통 스피너를 보여줍니다', async () => {
+    post.mockReturnValue(new Promise(() => {}));
+    openModal();
+    submitRequest();
+
+    const button = await screen.findByRole('button', { name: '요청 중…' });
+    expect(button).toBeDisabled();
+    expect(screen.getByTestId('spinner')).toBeInTheDocument();
   });
 
   it('닫았다가 다시 열면 이전 결과가 남지 않습니다', async () => {
