@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { usePlacePhoto, useRecommendationData } from '../lib/hooks/queries';
-import { priceLevelSymbol } from '../lib/constants';
+import { googleMapsPlaceUrl, priceLevelSymbol } from '../lib/constants';
 import { errorMessage, MESSAGES } from '../lib/messages';
 import { mergeCandidates } from '../lib/mergeCandidates';
 import {
@@ -86,12 +86,22 @@ export default function Recommend({ location }: { location: SearchLocation | nul
               .filter(Boolean)
               .join(' · ')}
           </p>
+          {/* 메뉴·사진·리뷰는 Google 지도 상세로 넘긴다. placeId만 쓰므로 추가 API 비용이 없다. */}
+          <a
+            className={styles.detailLink}
+            href={googleMapsPlaceUrl(result.name, result.placeId)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            메뉴·리뷰 자세히 보기
+          </a>
           {/* 두 컴포넌트는 선택 상태를 들고 있으므로 대상이 바뀌면 remount해 이전 선택을 지운다. */}
           <RatingControls
             key={result.placeId}
             placeId={result.placeId}
             userId={userId}
             currentScore={result.personalRating}
+            onExclude={run}
           />
           <CategoryPrefs
             key={result.category}

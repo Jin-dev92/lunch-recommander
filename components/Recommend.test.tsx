@@ -80,6 +80,20 @@ describe('추천 실행', () => {
     expect(post).toHaveBeenCalledWith('/nearby', location);
   });
 
+  it('추천 결과에 Google 지도 상세 링크를 보여줍니다', async () => {
+    post.mockResolvedValue(mockNearby([restaurant]));
+    mockTables();
+    renderWithQuery(<Recommend location={location} />);
+    fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
+    const link = (await screen.findByRole('link', {
+      name: '메뉴·리뷰 자세히 보기',
+    })) as HTMLAnchorElement;
+    expect(link.href).toContain('query_place_id=p1');
+    // 외부 새 탭 이동 시 opener 노출을 막아야 한다.
+    expect(link.rel).toContain('noopener');
+    expect(link.target).toBe('_blank');
+  });
+
   it('가격대가 있으면 카테고리·거리와 함께 ₩ 기호로 보여줍니다', async () => {
     mockPostByRoute([{ ...restaurant, priceLevel: 'PRICE_LEVEL_MODERATE' }]);
     mockTables();

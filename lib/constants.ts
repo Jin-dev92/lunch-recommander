@@ -30,6 +30,16 @@ export function priceLevelSymbol(priceLevel: string | null): string {
   return priceLevel ? (PRICE_LEVEL_SYMBOLS[priceLevel] ?? '') : '';
 }
 
+/**
+ * Google 지도의 해당 가게 상세 페이지 URL. 메뉴·사진·리뷰·영업시간을 여기서 볼 수 있다.
+ * placeId만 쓰므로 추가 API 호출·비용이 없다. query는 필수라 이름을 함께 넣는다.
+ * @see https://developers.google.com/maps/documentation/urls/get-started#search-action
+ */
+export function googleMapsPlaceUrl(name: string, placeId: string): string {
+  const params = new URLSearchParams({ api: '1', query: name, query_place_id: placeId });
+  return `https://www.google.com/maps/search/?${params.toString()}`;
+}
+
 export const TABLE = {
   RATINGS: 'ratings',
   CATEGORY_PREFS: 'category_prefs',
