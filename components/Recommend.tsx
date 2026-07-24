@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { useRecommendationData } from '../lib/hooks/queries';
+import { usePlacePhoto, useRecommendationData } from '../lib/hooks/queries';
+import { priceLevelSymbol } from '../lib/constants';
 import { errorMessage, MESSAGES } from '../lib/messages';
 import { mergeCandidates } from '../lib/mergeCandidates';
 import {
@@ -14,7 +15,13 @@ import RatingControls from './RatingControls';
 import CategoryPrefs from './CategoryPrefs';
 import styles from './Recommend.module.css';
 
-type Result = Candidate & { name: string; categoryLabel: string; weight: number };
+type Result = Candidate & {
+  name: string;
+  categoryLabel: string;
+  priceLevel: string | null;
+  photoName: string | null;
+  weight: number;
+};
 
 export default function Recommend({ location }: { location: SearchLocation | null }) {
   const [result, setResult] = useState<Result | null>(null);
@@ -22,6 +29,8 @@ export default function Recommend({ location }: { location: SearchLocation | nul
   const [error, setError] = useState('');
   const [categoryWeights, setCategoryWeights] = useState<Record<string, number>>({});
   const { refetch, isFetching } = useRecommendationData(location);
+  // 사진은 추천된 곳에 photoName이 있을 때만 조회된다(hook 안에서 enabled로 제어).
+  const photo = usePlacePhoto(result?.photoName ?? null);
 
   // 추첨은 누를 때마다 결과가 달라져야 하므로 캐시된 data를 그대로 쓰지 않고 매번 refetch한다.
   async function run() {
@@ -54,9 +63,28 @@ export default function Recommend({ location }: { location: SearchLocation | nul
       </button>
       {result && (
         <article className={styles.result}>
-          <h2 className={styles.name}>{result.name}</h2>
+          <div className={styles.resultHeader}>
+            {/* 가게 외형은 이름 텍스트에 없는 정보라 의미 있는 alt를 준다. */}
+            {photo.data && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                className={styles.thumbnail}
+                src={photo.data}
+                alt={`${result.name} 사진`}
+                width={72}
+                height={72}
+              />
+            )}
+            <h2 className={styles.name}>{result.name}</h2>
+          </div>
           <p className={styles.meta}>
-            {result.categoryLabel} · {Math.round(result.distanceMeters)}m
+            {[
+              result.categoryLabel,
+              priceLevelSymbol(result.priceLevel),
+              `${Math.round(result.distanceMeters)}m`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
           </p>
           {/* 두 컴포넌트는 선택 상태를 들고 있으므로 대상이 바뀌면 remount해 이전 선택을 지운다. */}
           <RatingControls

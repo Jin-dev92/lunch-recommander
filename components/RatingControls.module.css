@@ -4,12 +4,11 @@
 }
 
 .scoreGrid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
+  display: flex;
+  justify-content: center;
+  gap: 0;
 }
 
-.scoreButton,
 .snoozeButton,
 .excludeButton {
   min-height: 44px;
@@ -32,10 +31,34 @@
 
 .scoreButton {
   min-width: 44px;
-  padding: 0 2px;
+  min-height: 44px;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    color 180ms,
+    transform 180ms,
+    opacity 180ms;
 }
 
-.scoreButton:hover:not(:disabled),
+.scoreButton span::before {
+  content: '☆';
+  display: inline-block;
+  font-size: 30px;
+  line-height: 1;
+  transition:
+    color 180ms,
+    filter 180ms,
+    transform 180ms;
+}
+
+.scoreButton span {
+  font-size: 0;
+}
+
 .snoozeButton:hover:not(:disabled),
 .excludeButton:hover:not(:disabled) {
   color: var(--color-accent-hover);
@@ -43,13 +66,11 @@
   border-color: var(--color-accent);
 }
 
-.scoreButton:active:not(:disabled),
 .snoozeButton:active:not(:disabled),
 .excludeButton:active:not(:disabled) {
   transform: scale(0.98);
 }
 
-.scoreButton:focus-visible,
 .snoozeButton:focus-visible,
 .excludeButton:focus-visible {
   outline: none;
@@ -57,23 +78,57 @@
   box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
 }
 
-.scoreButton:disabled,
 .snoozeButton:disabled,
 .excludeButton:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }
 
+.scoreButton:hover:not(:disabled),
 .filled {
-  color: var(--color-surface);
-  background: var(--color-accent);
-  border-color: var(--color-accent);
+  color: var(--color-star);
 }
 
-.scoreButton[aria-pressed='true'] {
-  background: var(--color-accent-hover);
-  border-color: var(--color-accent-hover);
-  box-shadow: inset 0 0 0 1px var(--color-surface);
+.filled span::before {
+  content: '★';
+}
+
+.scoreButton:active:not(:disabled) span::before {
+  transform: scale(0.94);
+}
+
+.scoreButton:focus-visible {
+  outline: 2px solid var(--color-star);
+  outline-offset: -5px;
+}
+
+.scoreButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.scoreButton[aria-pressed='true'] span::before {
+  filter: drop-shadow(0 1px 1px rgba(146, 91, 0, 0.35));
+  transform: scale(1.08);
+}
+
+.scoreGrid:has(.scoreButton:nth-child(1):hover:not(:disabled))
+  .scoreButton:nth-child(-n + 1)
+  span::before,
+.scoreGrid:has(.scoreButton:nth-child(2):hover:not(:disabled))
+  .scoreButton:nth-child(-n + 2)
+  span::before,
+.scoreGrid:has(.scoreButton:nth-child(3):hover:not(:disabled))
+  .scoreButton:nth-child(-n + 3)
+  span::before,
+.scoreGrid:has(.scoreButton:nth-child(4):hover:not(:disabled))
+  .scoreButton:nth-child(-n + 4)
+  span::before,
+.scoreGrid:has(.scoreButton:nth-child(5):hover:not(:disabled))
+  .scoreButton:nth-child(-n + 5)
+  span::before {
+  content: '★';
+  color: var(--color-star);
 }
 
 .actions {
@@ -111,21 +166,8 @@
 }
 
 @media (max-width: 360px) {
-  .scoreGrid {
-    gap: 0;
-  }
-
-  .scoreButton {
-    border-radius: 0;
-    font-size: 12px;
-  }
-
-  .scoreButton:first-child {
-    border-radius: 8px 0 0 8px;
-  }
-
-  .scoreButton:last-child {
-    border-radius: 0 8px 8px 0;
+  .scoreButton span::before {
+    font-size: 28px;
   }
 }
 
