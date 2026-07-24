@@ -7,6 +7,7 @@ import { ROUTES, SESSION_COOKIE } from '../lib/constants';
 import { useSignOut } from '../lib/hooks/mutations';
 import { errorMessage } from '../lib/messages';
 import type { SearchLocation } from '../lib/types/api';
+import styles from './page.module.css';
 
 export default function HomePage() {
   const [searchLocation, setSearchLocation] = useState<SearchLocation | null>(null);
@@ -22,16 +23,26 @@ export default function HomePage() {
     });
 
   return (
-    <main>
-      <h1>점심 추천</h1>
-      <Link href={ROUTES.GROUPS}>그룹 관리</Link>
-      <button onClick={logout} disabled={signOut.isPending}>
-        로그아웃
-      </button>
-      {signOut.isError && <p role="alert">{errorMessage(signOut.error)}</p>}
+    <main className={styles.main}>
+      <header className={styles.header}>
+        <h1 className={styles.title}>점심 추천</h1>
+        <nav className={styles.actions}>
+          <Link className={styles.secondaryAction} href={ROUTES.GROUPS}>
+            그룹 관리
+          </Link>
+          <button className={styles.secondaryAction} onClick={logout} disabled={signOut.isPending}>
+            로그아웃
+          </button>
+        </nav>
+      </header>
+      {signOut.isError && (
+        <p className={styles.error} role="alert">
+          {errorMessage(signOut.error)}
+        </p>
+      )}
       <Map onLocationChange={setSearchLocation} />
       {searchLocation && (
-        <p>
+        <p className={styles.location}>
           선택된 위치: {searchLocation.lat}, {searchLocation.lng} ({searchLocation.radius}m)
         </p>
       )}

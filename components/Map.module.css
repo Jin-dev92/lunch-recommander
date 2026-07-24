@@ -1,0 +1,66 @@
+.section {
+  padding: 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.radiusField {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.select {
+  min-width: 92px;
+  min-height: 44px;
+  padding: 0 34px 0 12px;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    border-color 180ms,
+    box-shadow 180ms;
+}
+
+.select:hover {
+  border-color: #bdbdbd;
+}
+
+.select:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
+}
+
+.map {
+  height: 240px;
+  overflow: hidden;
+  background: #f2f1ef;
+  border-radius: var(--radius-card);
+}
+
+.error {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  color: var(--color-error-text);
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-card);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+@media (min-width: 640px) {
+  .map {
+    height: 260px;
+  }
+}

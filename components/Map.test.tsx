@@ -21,6 +21,7 @@ describe('지도', () => {
     render(<Map onLocationChange={vi.fn()} />);
     expect(screen.getByRole('option', { name: '500m' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '1km' })).toBeInTheDocument();
+    expect(screen.getByLabelText('주변 지도')).not.toHaveAttribute('style');
   });
 
   it('현재 위치를 얻으면 콜백과 지도를 초기화합니다', async () => {
