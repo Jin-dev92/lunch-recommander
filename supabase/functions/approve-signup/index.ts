@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { withCors } from '../_shared/cors.ts';
 
 export type SignupRequest = {
   id: string;
@@ -108,5 +109,5 @@ if (import.meta.main) {
     now: () => new Date(),
     siteUrl,
   };
-  Deno.serve(createApproveSignupHandler(deps));
+  Deno.serve(withCors(createApproveSignupHandler(deps)));
 }

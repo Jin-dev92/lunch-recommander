@@ -1,6 +1,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { sendAdminNotification } from '../_shared/notify.ts';
 import { generateApprovalToken } from '../_shared/token.ts';
+import { withCors } from '../_shared/cors.ts';
 
 export type SignupRequestInsert = {
   email: string;
@@ -172,5 +173,5 @@ if (import.meta.main) {
     now: () => new Date(),
     siteUrl: Deno.env.get('SITE_URL')!,
   };
-  Deno.serve(createSignupRequestHandler(deps));
+  Deno.serve(withCors(createSignupRequestHandler(deps)));
 }
