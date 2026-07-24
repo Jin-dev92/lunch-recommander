@@ -163,6 +163,8 @@ describe('추천 실행', () => {
     await waitFor(() => {
       expect(button).toBeDisabled();
       expect(button.closest('section')).toHaveAttribute('aria-busy', 'true');
+      expect(button).toHaveTextContent('추천 중…');
+      expect(screen.getByTestId('spinner')).toBeInTheDocument();
     });
   });
 

@@ -19,6 +19,7 @@ import { ROUTES } from '../lib/constants';
 import Link from 'next/link';
 import RatingControls from './RatingControls';
 import CategoryPrefs from './CategoryPrefs';
+import Spinner from './Spinner';
 import styles from './Recommend.module.css';
 
 type Result = Candidate & {
@@ -74,7 +75,14 @@ export default function Recommend({
   return (
     <section className={styles.section} aria-busy={isFetching}>
       <button className={styles.primaryButton} onClick={run} disabled={!location || isFetching}>
-        한 곳 추천
+        {isFetching ? (
+          <>
+            <Spinner />
+            추천 중…
+          </>
+        ) : (
+          '한 곳 추천'
+        )}
       </button>
       {result && (
         <article className={styles.result}>

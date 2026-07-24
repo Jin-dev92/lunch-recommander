@@ -261,6 +261,34 @@ describe('지도', () => {
     );
   });
 
+  it('위치를 다시 요청하는 동안 버튼을 비활성화하고 스피너를 보여줍니다', async () => {
+    let retrySuccess: PositionCallback | undefined;
+    const getCurrentPosition = vi
+      .fn()
+      .mockImplementationOnce((_success, error) => error())
+      .mockImplementationOnce((success) => {
+        retrySuccess = success;
+      });
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
+    render(<Map onLocationChange={vi.fn()} />);
+    const retry = await screen.findByRole('button', {
+      name: '현재 위치 권한이 필요합니다.',
+    });
+
+    fireEvent.click(retry);
+
+    await waitFor(() => {
+      expect(retry).toBeDisabled();
+      expect(retry).toHaveAttribute('aria-busy', 'true');
+      expect(retry).toHaveTextContent('위치 확인 중…');
+      expect(screen.getByTestId('spinner')).toBeInTheDocument();
+    });
+
+    retrySuccess?.({
+      coords: { latitude: 37.5, longitude: 127 },
+    } as GeolocationPosition);
+  });
+
   it('반경을 변경하면 콜백에 새 반경이 전달됩니다', async () => {
     const getCurrentPosition = vi.fn((success) =>
       success({ coords: { latitude: 37.5, longitude: 127.0 } }),

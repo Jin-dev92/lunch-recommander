@@ -72,6 +72,9 @@
 }
 
 .retryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 0;
   color: inherit;
   font: inherit;
@@ -79,6 +82,10 @@
   background: transparent;
   border: 0;
   cursor: pointer;
+}
+
+.retryButton:disabled {
+  cursor: wait;
 }
 
 .retryButton:focus-visible {

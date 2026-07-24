@@ -11,6 +11,7 @@ import {
 } from '../lib/types/api';
 import { MESSAGES } from '../lib/messages';
 import styles from './Map.module.css';
+import Spinner from './Spinner';
 
 type Coords = { lat: number; lng: number };
 
@@ -42,13 +43,16 @@ export default function Map({
   );
   const [coords, setCoords] = useState<Coords | null>(null);
   const [error, setError] = useState('');
+  const [isLocating, setIsLocating] = useState(false);
 
   const requestLocation = useCallback(async (isRetry = false) => {
+    setIsLocating(true);
     if (isRetry && navigator.permissions?.query) {
       try {
         const permission = await navigator.permissions.query({ name: 'geolocation' });
         if (permission.state === 'denied') {
           setError(MESSAGES.GEOLOCATION_SETTINGS_REQUIRED);
+          setIsLocating(false);
           return;
         }
       } catch {
@@ -59,11 +63,14 @@ export default function Map({
       ({ coords }) => {
         setError('');
         setCoords({ lat: coords.latitude, lng: coords.longitude });
+        setIsLocating(false);
       },
-      () =>
+      () => {
         setError(
           isRetry ? MESSAGES.GEOLOCATION_SETTINGS_REQUIRED : MESSAGES.GEOLOCATION_DENIED,
-        ),
+        );
+        setIsLocating(false);
+      },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
   }, []);
@@ -181,8 +188,21 @@ export default function Map({
       <p className={styles.hint}>{MESSAGES.MAP_ADJUST_HINT}</p>
       {error && (
         <div className={styles.error} role="alert">
-          <button className={styles.retryButton} type="button" onClick={() => requestLocation(true)}>
-            {error}
+          <button
+            className={styles.retryButton}
+            type="button"
+            disabled={isLocating}
+            aria-busy={isLocating}
+            onClick={() => requestLocation(true)}
+          >
+            {isLocating ? (
+              <>
+                <Spinner />
+                위치 확인 중…
+              </>
+            ) : (
+              error
+            )}
           </button>
         </div>
       )}
