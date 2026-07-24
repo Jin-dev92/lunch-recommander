@@ -165,6 +165,33 @@
   line-height: 1.5;
 }
 
+.confirmDialog {
+  width: calc(100% - 48px);
+  max-width: 320px;
+  padding: 24px 22px 20px;
+  border: none;
+  border-radius: 14px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+}
+
+.confirmDialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.confirmMessage {
+  margin: 0 0 20px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.confirmActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
 @media (max-width: 360px) {
   .scoreButton span::before {
     font-size: 28px;

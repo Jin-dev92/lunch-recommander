@@ -59,16 +59,38 @@ describe('평점 저장', () => {
     expect(screen.getAllByRole('button', { name: /^[1-5]점$/ })).toHaveLength(5);
   });
 
-  it('"다시 추천 안 함"을 누르면 0점(영구 제외)으로 저장합니다', async () => {
+  it('"다시 추천 안 함"은 확인을 받기 전에는 저장하지 않습니다', () => {
     const { upsert } = mockRatings();
     renderWithQuery(<RatingControls placeId="p1" userId="me" />);
     fireEvent.click(screen.getByRole('button', { name: '다시 추천 안 함' }));
+    // 되돌릴 수 없는 동작이라 경고 대화가 먼저 뜨고, 이 단계에서 저장은 없어야 한다.
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('취소하면 대화가 닫히고 저장하지 않습니다', async () => {
+    const { upsert } = mockRatings();
+    renderWithQuery(<RatingControls placeId="p1" userId="me" />);
+    fireEvent.click(screen.getByRole('button', { name: '다시 추천 안 함' }));
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it('확인하면 0점(영구 제외)으로 저장하고 다음 추천을 요청합니다', async () => {
+    const { upsert } = mockRatings();
+    const onExclude = vi.fn();
+    renderWithQuery(<RatingControls placeId="p1" userId="me" onExclude={onExclude} />);
+    fireEvent.click(screen.getByRole('button', { name: '다시 추천 안 함' }));
+    fireEvent.click(screen.getByRole('button', { name: '제외하기' }));
     await vi.waitFor(() =>
       expect(upsert).toHaveBeenCalledWith(
         { user_id: 'me', place_id: 'p1', score: 0 },
         { onConflict: 'user_id,place_id' },
       ),
     );
+    // 저장이 끝난 뒤에만 다음 추천을 띄운다.
+    await vi.waitFor(() => expect(onExclude).toHaveBeenCalledTimes(1));
   });
 
   it('기존 평점을 별의 채움 상태로 반영합니다', () => {
