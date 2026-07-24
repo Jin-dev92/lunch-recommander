@@ -59,6 +59,20 @@ URL은 프론트엔드 코드가 아니라 Edge Function 시크릿 `DISCORD_WEBH
 - `signup-request`: 가입 요청 접수, 사용량 제한 검사, 중복 검사, 관리자 알림 발송을 담당합니다.
 - `approve-signup`: `GET` 요청으로 가입 요청 정보를 조회하고, `POST` 요청으로 승인 또는 거절과 사용자 초대를 처리합니다.
 
+두 함수는 **JWT 검증을 끈 상태로 배포합니다**. Supabase는 Edge Function 앞단 게이트웨이에서
+`Authorization` 헤더의 JWT를 검사하는 `verify_jwt` 옵션을 기본값 `true`로 둡니다. 그런데
+`signup-request`는 아직 계정이 없는 방문자가 호출하고, `approve-signup`은 알림 링크를 누른
+관리자가 로그인 없이 호출합니다. 기본값을 그대로 두면 게이트웨이가 핸들러 실행 전에 401로
+막아 두 기능이 모두 동작하지 않습니다.
+
+설정은 `supabase/config.toml`의 `[functions.<이름>]` 블록에 선언합니다. 배포 명령의
+`--no-verify-jwt` 플래그로도 같은 효과를 낼 수 있지만, 플래그는 다음 배포 때 빠뜨리기 쉽습니다.
+
+인증이 사라지는 것은 아닙니다. 두 함수는 각자 자체 수단으로 요청을 검증합니다.
+`signup-request`는 IP·이메일 기준 사용량 제한으로, `approve-signup`은 URL 또는 본문에 담긴
+승인 토큰의 존재·만료·상태 검사로 처리합니다. 반면 로그인 사용자만 호출하는 `nearby`는
+`verify_jwt`를 켠 상태를 유지합니다.
+
 ### 4.3 데이터베이스
 
 `signup_requests` 테이블은 가입 요청 이메일, 승인 토큰, 처리 상태, 생성 시각, 만료 시각을 저장합니다.
@@ -240,6 +254,8 @@ Discord 웹훅 URL과 Supabase 관리자 API 권한은 Edge Function에서만 �
 
 - Discord 채널에서 Incoming Webhook을 만들고 URL을 확보합니다.
 - Edge Function 시크릿 `DISCORD_WEBHOOK_URL`을 설정합니다.
+- Edge Function 시크릿 `SITE_URL`을 실제 배포 도메인으로 설정합니다.
+  두 Edge Function이 승인 링크와 초대 redirect 주소를 만드는 데 사용합니다.
 - Supabase Auth의 허용된 redirect URL에 비밀번호 설정 페이지 주소를 추가합니다.
 - 사용자 초대 메일은 Supabase 내장 발송을 사용합니다. 발송량이 내장 한도를 넘으면
   Supabase Auth에 별도 SMTP를 설정합니다.

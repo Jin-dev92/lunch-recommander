@@ -385,6 +385,16 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# 아래 두 함수는 로그인하지 않은 사용자가 호출한다. verify_jwt 기본값(true)이면
+# Supabase 게이트웨이가 핸들러 실행 전에 401로 막아 기능이 동작하지 않는다.
+# signup-request: 아직 계정이 없는 방문자가 가입을 요청한다.
+# approve-signup: 알림 링크를 누른 관리자가 호출하며, 인증은 URL/본문의 승인 토큰으로 한다.
+[functions.signup-request]
+verify_jwt = false
+
+[functions.approve-signup]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
