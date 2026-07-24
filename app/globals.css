@@ -10,6 +10,7 @@
   --color-error-text: #92400e;
   --color-error-bg: #fff4ed;
   --color-error-border: #f2c9b3;
+  --color-map-bg: #f2f1ef;
   --radius-card: 10px;
   --shadow-card: 0 6px 20px rgba(31, 31, 31, 0.045);
 }

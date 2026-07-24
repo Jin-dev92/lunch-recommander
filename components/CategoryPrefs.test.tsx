@@ -9,62 +9,74 @@ import CategoryPrefs from './CategoryPrefs';
 
 const from = supabase.from as ReturnType<typeof vi.fn>;
 
+function mockUpsert(error: unknown = null) {
+  const upsert = vi.fn().mockResolvedValue({ data: null, error });
+  from.mockImplementation(() => ({ upsert }));
+  return upsert;
+}
+
+function render(currentWeight?: number) {
+  return renderWithQuery(
+    <CategoryPrefs
+      userId="me"
+      category="korean_restaurant"
+      categoryLabel="한식당"
+      currentWeight={currentWeight}
+    />,
+  );
+}
+
 describe('카테고리 기호 저장', () => {
   beforeEach(() => {
     from.mockReset();
   });
 
-  it('입력값에서 포커스가 벗어나면 해당 카테고리의 weight가 upsert됩니다', async () => {
-    const upsert = vi.fn().mockResolvedValue({ data: null, error: null });
-    from.mockImplementation(() => ({ upsert }));
-    renderWithQuery(<CategoryPrefs userId="me" categories={['한식']} />);
-    const input = screen.getByLabelText('한식');
-    fireEvent.change(input, { target: { value: '1.5' } });
-    fireEvent.blur(input);
+  it('표시 이름으로 3단계 선택지를 보여줍니다', () => {
+    mockUpsert();
+    render();
+    expect(screen.getByText('한식당, 얼마나 좋아하세요?')).toBeInTheDocument();
+    for (const label of ['별로예요', '보통', '좋아요']) {
+      expect(screen.getByRole('radio', { name: label })).toBeInTheDocument();
+    }
+  });
+
+  // 세 번째 인자는 시작 가중치다. 이미 선택된 항목을 다시 누르면 값이 바뀌지 않아
+  // change 이벤트가 없고 저장도 일어나지 않으므로, 각 케이스는 다른 값에서 출발한다.
+  it.each([
+    ['별로예요', 0.5, undefined],
+    ['보통', 1, 2],
+    ['좋아요', 2, undefined],
+  ])('%s를 고르면 가중치 %f로 저장합니다', async (label, weight, initial) => {
+    const upsert = mockUpsert();
+    render(initial);
+    fireEvent.click(screen.getByRole('radio', { name: label }));
     await vi.waitFor(() =>
+      // 저장 키는 표시용 한글이 아니라 안정적인 기계값이어야 한다.
       expect(upsert).toHaveBeenCalledWith(
-        { user_id: 'me', category: '한식', weight: 1.5 },
+        { user_id: 'me', category: 'korean_restaurant', weight },
         { onConflict: 'user_id,category' },
       ),
     );
     expect(from).toHaveBeenCalledWith('category_prefs');
   });
 
-  it('저장된 weight가 있으면 초기값으로 표시합니다', () => {
-    renderWithQuery(
-      <CategoryPrefs userId="me" categories={['한식']} currentWeights={{ 한식: 2.5 }} />,
-    );
-    expect(screen.getByLabelText('한식')).toHaveValue(2.5);
+  it('저장된 가중치가 있으면 해당 선택지가 선택된 상태로 보입니다', () => {
+    mockUpsert();
+    render(2);
+    expect(screen.getByRole('radio', { name: '좋아요' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: '보통' })).not.toBeChecked();
   });
 
-  it('저장된 weight가 없으면 기본값 1을 표시합니다', () => {
-    renderWithQuery(<CategoryPrefs userId="me" categories={['한식']} />);
-    expect(screen.getByLabelText('한식')).toHaveValue(1);
-  });
-
-  it('값 변경 없이 blur해도 저장된 weight가 그대로 유지됩니다', async () => {
-    const upsert = vi.fn().mockResolvedValue({ data: null, error: null });
-    from.mockImplementation(() => ({ upsert }));
-    renderWithQuery(
-      <CategoryPrefs userId="me" categories={['한식']} currentWeights={{ 한식: 2.5 }} />,
-    );
-    const input = screen.getByLabelText('한식');
-    fireEvent.focus(input);
-    fireEvent.blur(input);
-    await vi.waitFor(() =>
-      expect(upsert).toHaveBeenCalledWith(
-        { user_id: 'me', category: '한식', weight: 2.5 },
-        { onConflict: 'user_id,category' },
-      ),
-    );
+  it('저장된 가중치가 없으면 보통이 기본 선택입니다', () => {
+    mockUpsert();
+    render();
+    expect(screen.getByRole('radio', { name: '보통' })).toBeChecked();
   });
 
   it('저장에 실패하면 에러를 표시합니다', async () => {
-    from.mockImplementation(() => ({
-      upsert: vi.fn().mockResolvedValue({ data: null, error: { message: 'db error' } }),
-    }));
-    renderWithQuery(<CategoryPrefs userId="me" categories={['한식']} />);
-    fireEvent.blur(screen.getByLabelText('한식'));
+    mockUpsert({ message: 'db error' });
+    render();
+    fireEvent.click(screen.getByRole('radio', { name: '좋아요' }));
     await screen.findByRole('alert');
   });
 });

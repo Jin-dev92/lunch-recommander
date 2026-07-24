@@ -7,6 +7,7 @@ export const MESSAGES = {
   CATEGORY_PREF_SAVE_FAILED: '기호 저장에 실패했습니다.',
   GEOLOCATION_DENIED: '현재 위치 권한이 필요합니다.',
   MAP_LOAD_FAILED: '지도를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
+  MAP_ADJUST_HINT: '위치가 실제와 다르면 지도를 누르거나 핀을 끌어 옮기세요.',
   GROUP_CREATE_FAILED: '그룹 생성에 실패했습니다.',
   GROUP_JOINED: '그룹에 가입했습니다.',
   // 서버가 안내 문구를 주지 않았을 때만 쓰는 대체 문구

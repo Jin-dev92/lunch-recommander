@@ -22,7 +22,8 @@ const location = { lat: 37, lng: 127, radius: 500 as const };
 const restaurant = {
   placeId: 'p1',
   name: '식당',
-  category: '한식',
+  category: 'korean_restaurant',
+  categoryLabel: '한식',
   lat: 37,
   lng: 127,
   googleRating: 4,

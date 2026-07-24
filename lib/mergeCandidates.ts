@@ -7,7 +7,7 @@ export function mergeCandidates(
   prefs: CategoryPrefRow[],
   currentUserId: string,
 ): {
-  candidates: (Candidate & { name: string })[];
+  candidates: (Candidate & { name: string; categoryLabel: string })[];
   categoryWeights: Record<string, number>;
 } {
   const candidates = restaurants.map((restaurant) => {

@@ -44,8 +44,15 @@
 .map {
   height: 240px;
   overflow: hidden;
-  background: #f2f1ef;
+  background: var(--color-map-bg);
   border-radius: var(--radius-card);
+}
+
+.hint {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .error {

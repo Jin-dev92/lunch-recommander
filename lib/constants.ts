@@ -40,3 +40,18 @@ export const RPC = {
 
 // 평점 행이 없는 음식점을 스누즈할 때 기록할 중립 점수(0=영구 제외, 5=최고)
 export const NEUTRAL_RATING_SCORE = 3;
+
+// 별점으로 매길 수 있는 범위. 0은 별점이 아니라 "영구 제외"라 별과 분리해 다룬다.
+export const MIN_STAR_SCORE = 1;
+export const MAX_STAR_SCORE = 5;
+export const EXCLUDE_RATING_SCORE = 0;
+
+// 카테고리 선호 가중치. 추천 점수에 곱해지는 배수라 1이 중립이다.
+// 숫자를 그대로 입력받는 대신 의미가 드러나는 3단계로 고정한다.
+export const CATEGORY_PREFERENCE_OPTIONS = [
+  { label: '별로예요', weight: 0.5 },
+  { label: '보통', weight: 1 },
+  { label: '좋아요', weight: 2 },
+] as const;
+
+export const DEFAULT_CATEGORY_WEIGHT = 1;
