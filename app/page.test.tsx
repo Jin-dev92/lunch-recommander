@@ -41,8 +41,10 @@ describe('로그아웃', () => {
     expect(document.cookie).toContain('sb-session=1');
   });
 
-  it('그룹 관리 화면으로 이동하는 링크를 보여줍니다', () => {
+  it('그룹 관리 버튼을 누르면 모달이 열립니다', () => {
     renderWithQuery(<HomePage />);
-    expect(screen.getByRole('link', { name: '그룹 관리' })).toHaveAttribute('href', '/groups');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '그룹 관리' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });
