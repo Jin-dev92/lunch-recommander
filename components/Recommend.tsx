@@ -10,7 +10,11 @@ import {
   scoreCandidate,
   type Candidate,
 } from '../lib/recommend';
-import type { SearchLocation } from '../lib/types/api';
+import {
+  DEFAULT_RECOMMENDATION_CRITERIA,
+  type RecommendationCriteria,
+  type SearchLocation,
+} from '../lib/types/api';
 import { ROUTES } from '../lib/constants';
 import Link from 'next/link';
 import RatingControls from './RatingControls';
@@ -27,9 +31,11 @@ type Result = Candidate & {
 
 export default function Recommend({
   location,
+  criteria = DEFAULT_RECOMMENDATION_CRITERIA,
   canRate,
 }: {
   location: SearchLocation | null;
+  criteria?: RecommendationCriteria;
   // 로그인한 실사용자만 평가할 수 있다. 익명 사용자는 추천만 보고 평가 UI는 로그인 유도로 대체한다.
   canRate: boolean;
 }) {
@@ -53,7 +59,7 @@ export default function Recommend({
     setUserId(data.userId);
     const merged = mergeCandidates(data.restaurants, data.ratings, data.prefs, data.userId);
     setCategoryWeights(merged.categoryWeights);
-    const candidates = filterCandidates(merged.candidates, new Date()).map((candidate) => ({
+    const candidates = filterCandidates(merged.candidates, new Date(), criteria).map((candidate) => ({
       ...candidate,
       weight: scoreCandidate(candidate, {
         categoryWeights: merged.categoryWeights,
