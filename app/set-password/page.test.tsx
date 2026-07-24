@@ -12,20 +12,26 @@ const getSession = supabase.auth.getSession as ReturnType<typeof vi.fn>;
 const updateUser = supabase.auth.updateUser as ReturnType<typeof vi.fn>;
 
 describe('비밀번호 설정', () => {
+  let assign: ReturnType<typeof vi.fn>;
   beforeEach(() => {
     getSession.mockReset();
     updateUser.mockReset();
+    document.cookie = 'sb-session=; path=/; max-age=0';
+    assign = vi.fn();
+    // ponytail: jsdom의 window.location.assign은 non-configurable이라 vi.spyOn으로 못 덮어씀 → location 객체 자체를 교체
+    Object.defineProperty(window, 'location', {
+      writable: true,
+      value: { ...window.location, assign },
+    });
   });
 
   it('초대 세션이 없으면 잘못된 진입을 안내합니다', async () => {
     getSession.mockResolvedValue({ data: { session: null } });
     render(<SetPasswordPage />);
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      '유효한 초대 링크로 접속해 주세요.',
-    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('유효한 초대 링크로 접속해 주세요.');
   });
 
-  it('비밀번호 설정 성공 후 로그인 안내를 표시합니다', async () => {
+  it('비밀번호 설정 성공 시 세션 쿠키를 심고 메인으로 이동합니다', async () => {
     getSession.mockResolvedValue({ data: { session: { user: { id: 'user-1' } } } });
     updateUser.mockResolvedValue({ error: null });
     render(<SetPasswordPage />);
@@ -33,12 +39,23 @@ describe('비밀번호 설정', () => {
       target: { value: 'strong-password-1' },
     });
     fireEvent.submit(screen.getByRole('button', { name: '비밀번호 설정' }).closest('form')!);
-    await waitFor(() =>
-      expect(screen.getByRole('status')).toHaveTextContent(
-        '비밀번호를 설정했습니다. 이제 로그인할 수 있습니다.',
-      ),
-    );
+    // 초대 링크 세션이 이미 있으므로 재로그인 없이 바로 메인으로 보낸다.
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/'));
+    expect(document.cookie).toContain('sb-session=1');
     expect(updateUser).toHaveBeenCalledWith({ password: 'strong-password-1' });
+  });
+
+  it('비밀번호 설정에 실패하면 이동하지 않고 쿠키도 심지 않습니다', async () => {
+    getSession.mockResolvedValue({ data: { session: { user: { id: 'user-1' } } } });
+    updateUser.mockResolvedValue({ error: { message: '비밀번호가 너무 짧습니다.' } });
+    render(<SetPasswordPage />);
+    fireEvent.change(await screen.findByLabelText('새 비밀번호'), {
+      target: { value: 'short' },
+    });
+    fireEvent.submit(screen.getByRole('button', { name: '비밀번호 설정' }).closest('form')!);
+    await screen.findByRole('alert');
+    expect(assign).not.toHaveBeenCalled();
+    expect(document.cookie).not.toContain('sb-session=1');
   });
 
   it('비밀번호 설정 오류를 alert로 표시합니다', async () => {

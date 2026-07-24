@@ -89,17 +89,83 @@
   cursor: not-allowed;
 }
 
-.divider {
-  margin: 32px 0 24px;
-  border: none;
-  border-top: 1px solid var(--color-border);
+.altText {
+  margin: 32px 0 12px;
+  color: #6b6b6b;
+  font-size: 13px;
+  text-align: center;
 }
 
-.sectionTitle {
-  margin: 0 0 16px;
-  font-size: 16px;
+/* 로그인이 주 동작이므로 회원가입 요청은 외곽선 버튼으로 한 단계 낮춘다. */
+.secondaryButton {
+  display: block;
+  width: 100%;
+  padding: 11px 14px;
+  font-size: 14px;
   font-weight: 600;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    border-color 200ms,
+    background 200ms;
+}
+
+.secondaryButton:hover {
+  border-color: var(--color-accent);
+  background: #fff7f4;
+}
+
+.secondaryButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.35);
+}
+
+.dialog {
+  width: calc(100% - 48px);
+  max-width: 360px;
+  padding: 28px 24px 24px;
+  border: none;
+  border-radius: 14px;
+  background: #fff;
+  color: var(--color-text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+}
+
+.dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.dialogTitle {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
   text-align: center;
+}
+
+.dialogDescription {
+  margin: 0 0 24px;
+  color: #6b6b6b;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* 모달 안에서 닫기 버튼과 폼을 시각적으로 떼어 놓는다. */
+.dialog .secondaryButton {
+  margin-top: 12px;
+}
+
+.notice {
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: #1f5132;
+  background: #eef8f1;
+  border: 1px solid #bfe0cb;
+  border-radius: 10px;
 }
 
 .error {
