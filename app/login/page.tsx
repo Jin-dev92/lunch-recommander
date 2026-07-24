@@ -1,7 +1,7 @@
 'use client';
 import { useRef } from 'react';
 import { useForm } from 'react-hook-form';
-import { ROUTES, SESSION_COOKIE, SESSION_COOKIE_MAX_AGE_SECONDS } from '../../lib/constants';
+import { ROUTES } from '../../lib/constants';
 import { useRequestSignup, useSignIn } from '../../lib/hooks/mutations';
 import { errorMessage } from '../../lib/messages';
 import type { SignInRequest, SignupRequest } from '../../lib/types/api';
@@ -15,13 +15,11 @@ export default function LoginPage() {
   // 네이티브 <dialog>를 쓰면 백드롭·포커스 트랩·Esc 닫기를 브라우저가 처리한다.
   const dialog = useRef<HTMLDialogElement>(null);
 
-  // 쿠키 심기·화면 이동은 UI 후처리이므로 mutation hook이 아니라 소비 컴포넌트가 맡는다.
+  // 화면 이동은 UI 후처리이므로 mutation hook이 아니라 소비 컴포넌트가 맡는다.
+  // 로그인 성공 시 supabase-js가 실사용자 세션을 세우므로, 홈으로 보내면 로그인 상태로 뜬다.
   const submit = signInForm.handleSubmit((values) =>
     signIn.mutate(values, {
-      onSuccess: () => {
-        document.cookie = `${SESSION_COOKIE}=1; path=/; max-age=${SESSION_COOKIE_MAX_AGE_SECONDS}; samesite=lax`;
-        location.assign(ROUTES.HOME);
-      },
+      onSuccess: () => location.assign(ROUTES.HOME),
     }),
   );
 

@@ -10,7 +10,7 @@ import type {
   RecommendationData,
   SearchLocation,
 } from '../types/api';
-import { getCurrentUserId } from './auth';
+import { getCurrentUser } from './auth';
 import { unwrap } from './unwrap';
 
 /**
@@ -19,10 +19,17 @@ import { unwrap } from './unwrap';
  * (호출 시점 제어는 useRecommendationData의 `enabled: false`가 담당).
  */
 export async function getRecommendationData(location: SearchLocation): Promise<RecommendationData> {
-  const userId = await getCurrentUserId();
-  if (!userId) throw new Error(MESSAGES.LOGIN_REQUIRED);
+  const user = await getCurrentUser();
+  if (!user) throw new Error(MESSAGES.LOGIN_REQUIRED);
 
   const { data } = await axiosInstance.post<NearbyResponse>(API_ROUTES.NEARBY, location);
+  const restaurants = data.restaurants ?? [];
+
+  // 익명 사용자는 평점·기호가 없다(RLS도 익명 쓰기를 막는다). 그래서 개인화 데이터를 조회하지
+  // 않고 구글 평점·거리만으로 추천한다. 불필요한 질의와 RLS 경계 처리를 아낀다.
+  if (user.isAnonymous) {
+    return { userId: user.id, restaurants, ratings: [], prefs: [] };
+  }
 
   // 평점과 카테고리 기호는 서로 의존하지 않으므로 병렬로 가져온다.
   // unwrap은 Promise.all 밖에서 호출해야 나머지 한쪽이 미처리 rejection이 되지 않는다.
@@ -32,8 +39,8 @@ export async function getRecommendationData(location: SearchLocation): Promise<R
   ]);
 
   return {
-    userId,
-    restaurants: data.restaurants ?? [],
+    userId: user.id,
+    restaurants,
     ratings: unwrap<RatingRow[]>(ratings) ?? [],
     prefs: unwrap<CategoryPrefRow[]>(prefs) ?? [],
   };

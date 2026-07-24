@@ -31,7 +31,16 @@ describe('비밀번호 설정', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('유효한 초대 링크로 접속해 주세요.');
   });
 
-  it('비밀번호 설정 성공 시 세션 쿠키를 심고 메인으로 이동합니다', async () => {
+  it('익명 세션(초대 아님)이면 잘못된 진입을 안내합니다', async () => {
+    // 로그인이 optional이라 방문자는 익명 세션을 가질 수 있다. 익명은 초대가 아니므로 막는다.
+    getSession.mockResolvedValue({
+      data: { session: { user: { id: 'anon', is_anonymous: true } } },
+    });
+    render(<SetPasswordPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('유효한 초대 링크로 접속해 주세요.');
+  });
+
+  it('비밀번호 설정 성공 시 메인으로 이동합니다', async () => {
     getSession.mockResolvedValue({ data: { session: { user: { id: 'user-1' } } } });
     updateUser.mockResolvedValue({ error: null });
     render(<SetPasswordPage />);
@@ -39,13 +48,12 @@ describe('비밀번호 설정', () => {
       target: { value: 'strong-password-1' },
     });
     fireEvent.submit(screen.getByRole('button', { name: '비밀번호 설정' }).closest('form')!);
-    // 초대 링크 세션이 이미 있으므로 재로그인 없이 바로 메인으로 보낸다.
+    // 초대 링크가 세운 실사용자 세션이 있으므로 재로그인 없이 바로 메인으로 보낸다.
     await waitFor(() => expect(assign).toHaveBeenCalledWith('/'));
-    expect(document.cookie).toContain('sb-session=1');
     expect(updateUser).toHaveBeenCalledWith({ password: 'strong-password-1' });
   });
 
-  it('비밀번호 설정에 실패하면 이동하지 않고 쿠키도 심지 않습니다', async () => {
+  it('비밀번호 설정에 실패하면 이동하지 않습니다', async () => {
     getSession.mockResolvedValue({ data: { session: { user: { id: 'user-1' } } } });
     updateUser.mockResolvedValue({ error: { message: '비밀번호가 너무 짧습니다.' } });
     render(<SetPasswordPage />);
@@ -55,7 +63,6 @@ describe('비밀번호 설정', () => {
     fireEvent.submit(screen.getByRole('button', { name: '비밀번호 설정' }).closest('form')!);
     await screen.findByRole('alert');
     expect(assign).not.toHaveBeenCalled();
-    expect(document.cookie).not.toContain('sb-session=1');
   });
 
   it('비밀번호 설정 오류를 alert로 표시합니다', async () => {

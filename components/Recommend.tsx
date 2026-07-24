@@ -11,6 +11,8 @@ import {
   type Candidate,
 } from '../lib/recommend';
 import type { SearchLocation } from '../lib/types/api';
+import { ROUTES } from '../lib/constants';
+import Link from 'next/link';
 import RatingControls from './RatingControls';
 import CategoryPrefs from './CategoryPrefs';
 import styles from './Recommend.module.css';
@@ -23,7 +25,14 @@ type Result = Candidate & {
   weight: number;
 };
 
-export default function Recommend({ location }: { location: SearchLocation | null }) {
+export default function Recommend({
+  location,
+  canRate,
+}: {
+  location: SearchLocation | null;
+  // 로그인한 실사용자만 평가할 수 있다. 익명 사용자는 추천만 보고 평가 UI는 로그인 유도로 대체한다.
+  canRate: boolean;
+}) {
   const [result, setResult] = useState<Result | null>(null);
   const [userId, setUserId] = useState('');
   const [error, setError] = useState('');
@@ -95,21 +104,29 @@ export default function Recommend({ location }: { location: SearchLocation | nul
           >
             메뉴·리뷰 자세히 보기
           </a>
-          {/* 두 컴포넌트는 선택 상태를 들고 있으므로 대상이 바뀌면 remount해 이전 선택을 지운다. */}
-          <RatingControls
-            key={result.placeId}
-            placeId={result.placeId}
-            userId={userId}
-            currentScore={result.personalRating}
-            onExclude={run}
-          />
-          <CategoryPrefs
-            key={result.category}
-            userId={userId}
-            category={result.category}
-            categoryLabel={result.categoryLabel}
-            currentWeight={categoryWeights[result.category]}
-          />
+          {canRate ? (
+            <>
+              {/* 두 컴포넌트는 선택 상태를 들고 있으므로 대상이 바뀌면 remount해 이전 선택을 지운다. */}
+              <RatingControls
+                key={result.placeId}
+                placeId={result.placeId}
+                userId={userId}
+                currentScore={result.personalRating}
+                onExclude={run}
+              />
+              <CategoryPrefs
+                key={result.category}
+                userId={userId}
+                category={result.category}
+                categoryLabel={result.categoryLabel}
+                currentWeight={categoryWeights[result.category]}
+              />
+            </>
+          ) : (
+            <p className={styles.loginPrompt}>
+              <Link href={ROUTES.LOGIN}>로그인</Link>하면 별점·취향을 반영해 더 잘 골라드려요.
+            </p>
+          )}
         </article>
       )}
       {error && (

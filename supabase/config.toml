@@ -175,7 +175,9 @@ refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
 enable_signup = true
 # Allow/disallow anonymous sign-ins to your project.
-enable_anonymous_sign_ins = false
+# 로그인 없이 추천을 쓰게 하되 유료 nearby 호출을 JWT 뒤에 두기 위해 익명 세션을 발급한다.
+# 평점·기호 등 쓰기는 RLS(0007)가 익명 사용자를 막는다.
+enable_anonymous_sign_ins = true
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.

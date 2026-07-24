@@ -1,6 +1,6 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
-import { ROUTES, SESSION_COOKIE, SESSION_COOKIE_MAX_AGE_SECONDS } from '../../lib/constants';
+import { ROUTES } from '../../lib/constants';
 import { supabase } from '../../lib/supabaseClient';
 import styles from '../login/login.module.css';
 
@@ -16,8 +16,10 @@ export default function SetPasswordPage() {
   useEffect(() => {
     (async () => {
       try {
+        // 로그인이 optional이라 방문자에겐 익명 세션이 있을 수 있다. 익명 세션은 초대가 아니므로
+        // 실사용자 세션(초대 링크가 세운다)일 때만 비밀번호 설정을 허용한다.
         const { data } = await supabase.auth.getSession();
-        setHasSession(Boolean(data.session));
+        setHasSession(Boolean(data.session) && !data.session?.user.is_anonymous);
       } catch {
         setSessionError('초대 정보를 확인하지 못했습니다. 다시 시도해 주세요.');
       } finally {
@@ -38,9 +40,7 @@ export default function SetPasswordPage() {
       else {
         setMessage('비밀번호를 설정했습니다. 잠시 후 이동합니다.');
         setSuccess(true);
-        // 초대 링크로 이미 세션이 서 있으므로 다시 로그인시키지 않는다. 미들웨어가 확인하는
-        // 마커 쿠키만 심어 주고 메인으로 보낸다(로그인 화면과 동일한 방식).
-        document.cookie = `${SESSION_COOKIE}=1; path=/; max-age=${SESSION_COOKIE_MAX_AGE_SECONDS}; samesite=lax`;
+        // 초대 링크로 이미 실사용자 세션이 서 있으므로 다시 로그인시키지 않고 홈으로 보낸다.
         location.assign(ROUTES.HOME);
       }
     } catch {

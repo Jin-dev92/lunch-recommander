@@ -5,9 +5,21 @@ import { supabase } from '../supabaseClient';
 import type { SignInRequest, SignupRequest, SignupRequestResponse } from '../types/api';
 import { assertNoError } from './unwrap';
 
-export async function getCurrentUserId(): Promise<string | null> {
+export type CurrentUser = { id: string; isAnonymous: boolean };
+
+export async function getCurrentUser(): Promise<CurrentUser | null> {
   const { data } = await supabase.auth.getUser();
-  return data.user?.id ?? null;
+  if (!data.user) return null;
+  return { id: data.user.id, isAnonymous: Boolean(data.user.is_anonymous) };
+}
+
+/**
+ * 세션이 없으면 익명 세션을 만든다. 로그인은 optional이지만 유료인 nearby 호출은 JWT 뒤에
+ * 두어야 하므로, 방문자마다 익명 JWT를 발급해 인증·레이트리밋을 그대로 유지한다.
+ */
+export async function ensureSession(): Promise<void> {
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) await supabase.auth.signInAnonymously();
 }
 
 export async function signIn({ email, password }: SignInRequest): Promise<void> {
