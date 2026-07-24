@@ -61,14 +61,42 @@ beforeEach(() => {
 });
 
 describe('지도', () => {
-  it('두 검색 반경을 제공합니다', () => {
+  it('검색 반경과 추천 품질 조건을 제공합니다', () => {
     vi.stubGlobal('navigator', {
       geolocation: { getCurrentPosition: vi.fn() },
     });
-    render(<Map onLocationChange={vi.fn()} />);
+    render(<Map onLocationChange={vi.fn()} onCriteriaChange={vi.fn()} />);
+    expect(screen.getByRole('option', { name: '100m' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '300m' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '500m' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '1km' })).toBeInTheDocument();
+    expect(screen.getByLabelText('최소 평점')).toHaveValue('3.5');
+    expect(screen.getByLabelText('최소 리뷰 수')).toHaveValue('30');
+    expect(
+      screen.getByRole('option', { name: '평점 5.0 이상' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '리뷰 100개 이상' })).toBeInTheDocument();
     expect(screen.getByLabelText('주변 지도')).not.toHaveAttribute('style');
+  });
+
+  it('추천 품질 조건을 변경하면 콜백에 완전한 조건을 전달합니다', () => {
+    vi.stubGlobal('navigator', {
+      geolocation: { getCurrentPosition: vi.fn() },
+    });
+    const onCriteriaChange = vi.fn();
+    render(<Map onLocationChange={vi.fn()} onCriteriaChange={onCriteriaChange} />);
+
+    fireEvent.change(screen.getByLabelText('최소 평점'), { target: { value: '4.5' } });
+    expect(onCriteriaChange).toHaveBeenLastCalledWith({
+      minGoogleRating: 4.5,
+      minGoogleReviews: 30,
+    });
+
+    fireEvent.change(screen.getByLabelText('최소 리뷰 수'), { target: { value: '70' } });
+    expect(onCriteriaChange).toHaveBeenLastCalledWith({
+      minGoogleRating: 4.5,
+      minGoogleReviews: 70,
+    });
   });
 
   it('현재 위치를 얻으면 콜백과 지도를 초기화합니다', async () => {
@@ -185,12 +213,51 @@ describe('지도', () => {
     await waitFor(() => expect(mapMock).toHaveBeenCalledTimes(1));
   });
 
-  it('위치 권한이 거부되면 에러 메시지를 보여줍니다', async () => {
-    const getCurrentPosition = vi.fn((_success, error) => error());
+  it('위치 권한이 거부되면 다시 요청할 수 있고 성공 시 경고를 지웁니다', async () => {
+    const getCurrentPosition = vi
+      .fn()
+      .mockImplementationOnce((_success, error) => error())
+      .mockImplementationOnce((success) =>
+        success({ coords: { latitude: 37.5, longitude: 127.0 } }),
+      );
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
-    render(<Map onLocationChange={vi.fn()} />);
+    const onLocationChange = vi.fn();
+    render(<Map onLocationChange={onLocationChange} />);
+    const retry = await screen.findByRole('button', {
+      name: '현재 위치 권한이 필요합니다.',
+    });
+
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(getCurrentPosition).toHaveBeenCalledTimes(2));
     await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent('현재 위치 권한이 필요합니다.'),
+      expect(onLocationChange).toHaveBeenCalledWith({
+        lat: 37.5,
+        lng: 127.0,
+        radius: 500,
+      }),
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('위치 권한이 영구 차단되면 브라우저 설정 안내를 보여줍니다', async () => {
+    const getCurrentPosition = vi.fn((_success, error) => error());
+    const query = vi.fn().mockResolvedValue({ state: 'denied' });
+    vi.stubGlobal('navigator', {
+      geolocation: { getCurrentPosition },
+      permissions: { query },
+    });
+    render(<Map onLocationChange={vi.fn()} />);
+    const retry = await screen.findByRole('button', {
+      name: '현재 위치 권한이 필요합니다.',
+    });
+
+    fireEvent.click(retry);
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        '브라우저 설정에서 위치 권한을 허용해 주세요.',
+      ),
     );
   });
 
