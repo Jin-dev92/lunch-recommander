@@ -1,6 +1,7 @@
 'use client';
 import { useSaveRating, useSnoozeRating } from '../lib/hooks/mutations';
 import { MESSAGES } from '../lib/messages';
+import styles from './RatingControls.module.css';
 
 export default function RatingControls({ placeId, userId }: { placeId: string; userId: string }) {
   const saveRating = useSaveRating();
@@ -15,20 +16,31 @@ export default function RatingControls({ placeId, userId }: { placeId: string; u
   const isPending = saveRating.isPending || snoozeRating.isPending;
 
   return (
-    <section aria-label="개인 평점">
-      {[0, 1, 2, 3, 4, 5].map((score) => (
-        <button
-          key={score}
-          disabled={isPending}
-          onClick={() => saveRating.mutate({ userId, placeId, score })}
-        >
-          {score}점
-        </button>
-      ))}
-      <button disabled={isPending} onClick={() => snoozeRating.mutate({ userId, placeId })}>
+    <section className={styles.section} aria-label="개인 평점" aria-busy={isPending}>
+      <div className={styles.scoreGrid}>
+        {[0, 1, 2, 3, 4, 5].map((score) => (
+          <button
+            className={styles.scoreButton}
+            key={score}
+            disabled={isPending}
+            onClick={() => saveRating.mutate({ userId, placeId, score })}
+          >
+            {score}점
+          </button>
+        ))}
+      </div>
+      <button
+        className={styles.snoozeButton}
+        disabled={isPending}
+        onClick={() => snoozeRating.mutate({ userId, placeId })}
+      >
         1주간 그만 보기
       </button>
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
     </section>
   );
 }

@@ -74,6 +74,20 @@ describe('추천 실행', () => {
     expect(screen.getByRole('button', { name: '한 곳 추천' })).toBeDisabled();
   });
 
+  it('추천을 가져오는 동안 영역의 로딩 상태를 알리고 버튼을 비활성화합니다', async () => {
+    post.mockReturnValue(new Promise(() => {}));
+    mockTables();
+    renderWithQuery(<Recommend location={location} />);
+    const button = screen.getByRole('button', { name: '한 곳 추천' });
+
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(button).toBeDisabled();
+      expect(button.closest('section')).toHaveAttribute('aria-busy', 'true');
+    });
+  });
+
   it('로그인하지 않았으면 에러 메시지를 보여줍니다', async () => {
     getUser.mockResolvedValue({ data: { user: null } });
     renderWithQuery(<Recommend location={location} />);

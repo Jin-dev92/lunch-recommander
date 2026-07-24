@@ -1,0 +1,104 @@
+.section {
+  padding-top: 18px;
+  border-top: 1px solid var(--color-border);
+}
+
+.scoreGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.scoreButton,
+.snoozeButton {
+  min-height: 44px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    color 180ms,
+    border-color 180ms,
+    background-color 180ms,
+    box-shadow 180ms,
+    transform 180ms,
+    opacity 180ms;
+}
+
+.scoreButton {
+  min-width: 44px;
+  padding: 0 2px;
+}
+
+.scoreButton:hover:not(:disabled),
+.snoozeButton:hover:not(:disabled) {
+  color: var(--color-accent-hover);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.scoreButton:active:not(:disabled),
+.snoozeButton:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.scoreButton:focus-visible,
+.snoozeButton:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
+}
+
+.scoreButton:disabled,
+.snoozeButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.snoozeButton {
+  width: 100%;
+  margin-top: 10px;
+  padding: 0 14px;
+  color: var(--color-text-muted);
+}
+
+.error {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  color: var(--color-error-text);
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-card);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+@media (max-width: 360px) {
+  .scoreGrid {
+    gap: 0;
+  }
+
+  .scoreButton {
+    border-radius: 0;
+    font-size: 12px;
+  }
+
+  .scoreButton:first-child {
+    border-radius: 8px 0 0 8px;
+  }
+
+  .scoreButton:last-child {
+    border-radius: 0 8px 8px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scoreButton,
+  .snoozeButton {
+    transition: none;
+  }
+}

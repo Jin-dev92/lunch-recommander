@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { SearchLocation } from '../lib/types/api';
 import { MESSAGES } from '../lib/messages';
+import styles from './Map.module.css';
 
 type Coords = { lat: number; lng: number };
 
@@ -46,16 +47,24 @@ export default function Map({
   }, [coords?.lat, coords?.lng]);
 
   return (
-    <section>
-      <label>
+    <section className={styles.section}>
+      <label className={styles.radiusField}>
         검색 반경
-        <select value={radius} onChange={(e) => setRadius(Number(e.target.value) as 500 | 1000)}>
+        <select
+          className={styles.select}
+          value={radius}
+          onChange={(e) => setRadius(Number(e.target.value) as 500 | 1000)}
+        >
           <option value="500">500m</option>
           <option value="1000">1km</option>
         </select>
       </label>
-      <div ref={node} aria-label="주변 지도" style={{ height: 400 }} />
-      {error && <p role="alert">{error}</p>}
+      <div className={styles.map} ref={node} aria-label="주변 지도" />
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
     </section>
   );
 }

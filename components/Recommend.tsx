@@ -12,6 +12,7 @@ import {
 import type { SearchLocation } from '../lib/types/api';
 import RatingControls from './RatingControls';
 import CategoryPrefs from './CategoryPrefs';
+import styles from './Recommend.module.css';
 
 type Result = Candidate & { name: string; weight: number };
 
@@ -47,14 +48,14 @@ export default function Recommend({ location }: { location: SearchLocation | nul
   }
 
   return (
-    <section>
-      <button onClick={run} disabled={!location || isFetching}>
+    <section className={styles.section} aria-busy={isFetching}>
+      <button className={styles.primaryButton} onClick={run} disabled={!location || isFetching}>
         한 곳 추천
       </button>
       {result && (
-        <article>
-          <h2>{result.name}</h2>
-          <p>
+        <article className={styles.result}>
+          <h2 className={styles.name}>{result.name}</h2>
+          <p className={styles.meta}>
             {result.category} · {Math.round(result.distanceMeters)}m
           </p>
           <RatingControls placeId={result.placeId} userId={userId} />
@@ -65,7 +66,11 @@ export default function Recommend({ location }: { location: SearchLocation | nul
           />
         </article>
       )}
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
     </section>
   );
 }

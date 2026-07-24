@@ -1,6 +1,7 @@
 'use client';
 import { useSaveCategoryPref } from '../lib/hooks/mutations';
 import { MESSAGES } from '../lib/messages';
+import styles from './CategoryPrefs.module.css';
 
 export default function CategoryPrefs({
   userId,
@@ -14,11 +15,16 @@ export default function CategoryPrefs({
   const saveCategoryPref = useSaveCategoryPref();
 
   return (
-    <section aria-label="카테고리 기호">
+    <section
+      className={styles.section}
+      aria-label="카테고리 기호"
+      aria-busy={saveCategoryPref.isPending}
+    >
       {categories.map((category) => (
-        <label key={category}>
+        <label className={styles.field} key={category}>
           {category}
           <input
+            className={styles.input}
             type="number"
             min="0.1"
             max="3"
@@ -34,7 +40,11 @@ export default function CategoryPrefs({
           />
         </label>
       ))}
-      {saveCategoryPref.isError && <p role="alert">{MESSAGES.CATEGORY_PREF_SAVE_FAILED}</p>}
+      {saveCategoryPref.isError && (
+        <p className={styles.error} role="alert">
+          {MESSAGES.CATEGORY_PREF_SAVE_FAILED}
+        </p>
+      )}
     </section>
   );
 }
