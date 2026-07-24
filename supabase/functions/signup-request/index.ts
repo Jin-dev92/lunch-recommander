@@ -1,5 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { sendAdminNotification } from '../_shared/email.ts';
+import { sendAdminNotification } from '../_shared/notify.ts';
 import { generateApprovalToken } from '../_shared/token.ts';
 
 export type SignupRequestInsert = {
@@ -15,10 +15,9 @@ export type SignupRequestDeps = {
   findPending(email: string): Promise<boolean>;
   insert(input: SignupRequestInsert): Promise<void>;
   rollbackInsert(token: string): Promise<void>;
-  sendAdmin(input: { to: string; approveUrl: string; requesterEmail: string }): Promise<void>;
+  sendAdmin(input: { approveUrl: string; requesterEmail: string }): Promise<void>;
   generateToken(): string;
   now(): Date;
-  adminEmail: string;
   siteUrl: string;
 };
 
@@ -64,7 +63,7 @@ export function createSignupRequestHandler(deps: SignupRequestDeps) {
       // countRecent가 이 기록을 세므로, 저장 없이 끝나는 요청(중복 pending 등)을
       // 반복해도 rate limit을 우회할 수 없다.
       await deps.logAttempt(ip, email, now);
-      // 요금폭탄 주의: 스팸 요청이 Resend 발송·요금으로 직결
+      // 요금폭탄 주의: 스팸 요청이 DB 행 적재와 승인 후 Supabase 초대 메일 발송으로 직결
       const counts = await deps.countRecent(
         ip,
         email,
@@ -79,8 +78,7 @@ export function createSignupRequestHandler(deps: SignupRequestDeps) {
       // 이미 가입된 이메일인지는 여기서 확인하지 않는다(listUsers 사전 조회는 페이지네이션
       // 때문에 놓칠 수 있고, 응답을 다르게 주면 이메일 존재 여부가 열거될 수 있다). 그 판단은
       // approve-signup의 inviteUserByEmail 결과로 이미 처리하고 있다.
-      if (await deps.findPending(email))
-        return Response.json(ACCEPTED_RESPONSE, { status: 202 });
+      if (await deps.findPending(email)) return Response.json(ACCEPTED_RESPONSE, { status: 202 });
 
       const token = deps.generateToken();
       try {
@@ -100,12 +98,11 @@ export function createSignupRequestHandler(deps: SignupRequestDeps) {
       }
       try {
         await deps.sendAdmin({
-          to: deps.adminEmail,
           approveUrl: `${deps.siteUrl}/admin/approve?token=${encodeURIComponent(token)}`,
           requesterEmail: email,
         });
       } catch (error) {
-        // 메일 발송 실패 시 방금 넣은 pending 행을 되돌린다. 그대로 두면 재요청이
+        // 알림 발송 실패 시 방금 넣은 pending 행을 되돌린다. 그대로 두면 재요청이
         // pending 중복으로 막혀서 다시는 관리자에게 알림이 갈 수 없게 된다.
         await deps.rollbackInsert(token);
         throw error;
@@ -118,7 +115,7 @@ export function createSignupRequestHandler(deps: SignupRequestDeps) {
   };
 }
 
-// --- 운영 어댑터: 아래는 실제 Supabase/Resend 연동입니다. 테스트에서는 사용하지 않습니다. ---
+// --- 운영 어댑터: 아래는 실제 Supabase/Discord 연동입니다. 테스트에서는 사용하지 않습니다. ---
 
 if (import.meta.main) {
   const supabase = createClient(
@@ -127,24 +124,34 @@ if (import.meta.main) {
   );
   const deps: SignupRequestDeps = {
     logAttempt: async (ip, email, at) => {
-      const { error } = await supabase.from('signup_attempts')
+      const { error } = await supabase
+        .from('signup_attempts')
         .insert({ ip, email, created_at: at.toISOString() });
       if (error) throw error;
     },
     countRecent: async (ip, email, since) => {
       const [ipResult, emailResult] = await Promise.all([
-        supabase.from('signup_attempts').select('id', { count: 'exact', head: true })
-          .eq('ip', ip).gte('created_at', since),
-        supabase.from('signup_attempts').select('id', { count: 'exact', head: true })
-          .eq('email', email).gte('created_at', since),
+        supabase
+          .from('signup_attempts')
+          .select('id', { count: 'exact', head: true })
+          .eq('ip', ip)
+          .gte('created_at', since),
+        supabase
+          .from('signup_attempts')
+          .select('id', { count: 'exact', head: true })
+          .eq('email', email)
+          .gte('created_at', since),
       ]);
       if (ipResult.error) throw ipResult.error;
       if (emailResult.error) throw emailResult.error;
       return { ip: ipResult.count ?? 0, email: emailResult.count ?? 0 };
     },
     findPending: async (email) => {
-      const { count, error } = await supabase.from('signup_requests')
-        .select('id', { count: 'exact', head: true }).eq('email', email).eq('status', 'pending');
+      const { count, error } = await supabase
+        .from('signup_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('email', email)
+        .eq('status', 'pending');
       if (error) throw error;
       return (count ?? 0) > 0;
     },
@@ -159,17 +166,10 @@ if (import.meta.main) {
       const { error } = await supabase.from('signup_requests').delete().eq('token', token);
       if (error) throw error;
     },
-    sendAdmin: (input) => sendAdminNotification(
-      {
-        fetch,
-        apiKey: Deno.env.get('RESEND_API_KEY')!,
-        from: Deno.env.get('RESEND_FROM')!,
-      },
-      input,
-    ),
+    sendAdmin: (input) =>
+      sendAdminNotification({ fetch, webhookUrl: Deno.env.get('DISCORD_WEBHOOK_URL')! }, input),
     generateToken: generateApprovalToken,
     now: () => new Date(),
-    adminEmail: Deno.env.get('ADMIN_EMAIL')!,
     siteUrl: Deno.env.get('SITE_URL')!,
   };
   Deno.serve(createSignupRequestHandler(deps));

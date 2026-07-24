@@ -16,7 +16,6 @@ function makeDeps(overrides: Partial<SignupRequestDeps> = {}): SignupRequestDeps
     sendAdmin: async () => {},
     generateToken: () => 'a'.repeat(64),
     now: () => new Date('2026-07-23T00:00:00.000Z'),
-    adminEmail: 'admin@example.com',
     siteUrl: 'https://lunch.example.com',
     ...overrides,
   };
@@ -31,7 +30,10 @@ function request(email = 'guest@example.com', ip = '203.0.113.10') {
 }
 
 Deno.test('IP 또는 이메일 최근 요청이 5건이면 차단합니다', async () => {
-  for (const counts of [{ ip: 5, email: 0 }, { ip: 0, email: 5 }]) {
+  for (const counts of [
+    { ip: 5, email: 0 },
+    { ip: 0, email: 5 },
+  ]) {
     let inserted = false;
     const response = await createSignupRequestHandler(
       makeDeps({
@@ -46,19 +48,22 @@ Deno.test('IP 또는 이메일 최근 요청이 5건이면 차단합니다', asy
   }
 });
 
-Deno.test('rate limit 판단 전에 시도 자체를 기록합니다(저장 없이 끝나는 요청도 한도에 반영)', async () => {
-  let loggedWith: [string, string] | undefined;
-  const response = await createSignupRequestHandler(
-    makeDeps({
-      logAttempt: async (ip, email) => {
-        loggedWith = [ip, email];
-      },
-      countRecent: async () => ({ ip: 5, email: 0 }),
-    }),
-  )(request(' Guest@Example.com '));
-  assertEquals(response.status, 429);
-  assertEquals(loggedWith, ['203.0.113.10', 'guest@example.com']);
-});
+Deno.test(
+  'rate limit 판단 전에 시도 자체를 기록합니다(저장 없이 끝나는 요청도 한도에 반영)',
+  async () => {
+    let loggedWith: [string, string] | undefined;
+    const response = await createSignupRequestHandler(
+      makeDeps({
+        logAttempt: async (ip, email) => {
+          loggedWith = [ip, email];
+        },
+        countRecent: async () => ({ ip: 5, email: 0 }),
+      }),
+    )(request(' Guest@Example.com '));
+    assertEquals(response.status, 429);
+    assertEquals(loggedWith, ['203.0.113.10', 'guest@example.com']);
+  },
+);
 
 Deno.test('countRecent는 정규화된 이메일, IP, 1시간 전 시각으로 호출됩니다', async () => {
   let calledWith: [string, string, string] | undefined;
@@ -70,11 +75,7 @@ Deno.test('countRecent는 정규화된 이메일, IP, 1시간 전 시각으로 �
       },
     }),
   )(request(' Guest@Example.com ', '203.0.113.10'));
-  assertEquals(calledWith, [
-    '203.0.113.10',
-    'guest@example.com',
-    '2026-07-22T23:00:00.000Z',
-  ]);
+  assertEquals(calledWith, ['203.0.113.10', 'guest@example.com', '2026-07-22T23:00:00.000Z']);
 });
 
 Deno.test('pending 요청이 있으면 저장하거나 메일을 보내지 않습니다', async () => {
@@ -101,9 +102,7 @@ Deno.test('pending 요청이 있으면 저장하거나 메일을 보내지 않�
 
 Deno.test('정상 요청을 3일 만료로 저장하고 관리자에게 승인 링크를 보냅니다', async () => {
   let row: SignupRequestInsert | undefined;
-  let mail:
-    | { to: string; approveUrl: string; requesterEmail: string }
-    | undefined;
+  let mail: { approveUrl: string; requesterEmail: string } | undefined;
   const response = await createSignupRequestHandler(
     makeDeps({
       insert: async (input) => {
@@ -123,60 +122,66 @@ Deno.test('정상 요청을 3일 만료로 저장하고 관리자에게 승인 �
     expires_at: '2026-07-26T00:00:00.000Z',
   });
   assertEquals(mail, {
-    to: 'admin@example.com',
     approveUrl: `https://lunch.example.com/admin/approve?token=${'a'.repeat(64)}`,
     requesterEmail: 'guest@example.com',
   });
 });
 
-Deno.test('findPending 체크를 통과한 경합 요청도 unique index 위반이면 동일한 접수 응답을 돌려줍니다', async () => {
-  let mailed = false;
-  const response = await createSignupRequestHandler(
-    makeDeps({
-      insert: async () => {
-        throw new DuplicatePendingRequestError();
-      },
-      sendAdmin: async () => {
-        mailed = true;
-      },
-    }),
-  )(request());
-  assertEquals(response.status, 202);
-  assertEquals(await response.json(), {
-    message: '요청이 접수되었습니다. 승인되면 메일로 안내됩니다.',
-  });
-  assertEquals(mailed, false);
-});
+Deno.test(
+  'findPending 체크를 통과한 경합 요청도 unique index 위반이면 동일한 접수 응답을 돌려줍니다',
+  async () => {
+    let mailed = false;
+    const response = await createSignupRequestHandler(
+      makeDeps({
+        insert: async () => {
+          throw new DuplicatePendingRequestError();
+        },
+        sendAdmin: async () => {
+          mailed = true;
+        },
+      }),
+    )(request());
+    assertEquals(response.status, 202);
+    assertEquals(await response.json(), {
+      message: '요청이 접수되었습니다. 승인되면 메일로 안내됩니다.',
+    });
+    assertEquals(mailed, false);
+  },
+);
 
-Deno.test('신규/중복 pending/경합 요청 모두 동일한 응답이라 이메일 가입 여부를 알아낼 수 없습니다', async () => {
-  const newResponse = await createSignupRequestHandler(makeDeps())(request());
-  const duplicatePendingResponse = await createSignupRequestHandler(
-    makeDeps({ findPending: async () => true }),
-  )(request());
-  const racedResponse = await createSignupRequestHandler(
-    makeDeps({
-      insert: async () => {
-        throw new DuplicatePendingRequestError();
-      },
-    }),
-  )(request());
+Deno.test(
+  '신규/중복 pending/경합 요청 모두 동일한 응답이라 이메일 가입 여부를 알아낼 수 없습니다',
+  async () => {
+    const newResponse = await createSignupRequestHandler(makeDeps())(request());
+    const duplicatePendingResponse = await createSignupRequestHandler(
+      makeDeps({ findPending: async () => true }),
+    )(request());
+    const racedResponse = await createSignupRequestHandler(
+      makeDeps({
+        insert: async () => {
+          throw new DuplicatePendingRequestError();
+        },
+      }),
+    )(request());
 
-  const bodies = await Promise.all(
-    [newResponse, duplicatePendingResponse, racedResponse].map((response) => response.json()),
-  );
-  assertEquals(newResponse.status, 202);
-  assertEquals(duplicatePendingResponse.status, 202);
-  assertEquals(racedResponse.status, 202);
-  assertEquals(bodies[0], bodies[1]);
-  assertEquals(bodies[1], bodies[2]);
-});
+    const bodies = await Promise.all(
+      [newResponse, duplicatePendingResponse, racedResponse].map((response) => response.json()),
+    );
+    assertEquals(newResponse.status, 202);
+    assertEquals(duplicatePendingResponse.status, 202);
+    assertEquals(racedResponse.status, 202);
+    assertEquals(bodies[0], bodies[1]);
+    assertEquals(bodies[1], bodies[2]);
+  },
+);
 
-Deno.test('메일 발송에 실패하면 방금 만든 pending 행을 롤백하고 오류를 반환합니다', async () => {
+Deno.test('알림 발송에 실패하면 방금 만든 pending 행을 롤백하고 오류를 반환합니다', async () => {
   let rolledBackToken: string | undefined;
   const response = await createSignupRequestHandler(
     makeDeps({
       sendAdmin: async () => {
-        throw new Error('Resend API 키 sk_live_secret 노출 안됨 확인용 내부 오류');
+        // 웹훅 URL은 그 자체가 게시 권한이라 응답으로 새어 나가면 안 된다.
+        throw new Error('https://discord.com/api/webhooks/1/sk_live_secret 호출 실패');
       },
       rollbackInsert: async (token) => {
         rolledBackToken = token;
