@@ -13,6 +13,10 @@ export type NearbyRestaurant = {
   lng: number;
   googleRating: number | null;
   googleRatingsTotal: number;
+  // Google priceLevel 열거형. 실제 가격이 아니라 4단계 등급이며, 없는 가게가 많아 null 허용.
+  priceLevel: string | null;
+  // 사진 리소스 이름. 실제 이미지는 추천된 1곳에 한해 place-photo 함수가 해석한다.
+  photoName: string | null;
   distanceMeters: number;
 };
 export type NearbyDeps = {
@@ -99,8 +103,10 @@ export function createGoogleFetcher(googlePlacesApiKey: string): NearbyDeps['fet
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': googlePlacesApiKey,
+        // rating이 이미 Enterprise 등급을 부르므로 priceLevel·photos는 등급을 더 올리지 않는다.
+        // 사진은 여기서 이름만 받고(무료), 실제 이미지 해석은 추천된 1곳만 place-photo가 한다.
         'X-Goog-FieldMask':
-          'places.id,places.displayName,places.primaryType,places.primaryTypeDisplayName,places.location,places.rating,places.userRatingCount',
+          'places.id,places.displayName,places.primaryType,places.primaryTypeDisplayName,places.location,places.rating,places.userRatingCount,places.priceLevel,places.photos',
       },
       body: JSON.stringify({
         // languageCode가 없으면 displayName과 primaryTypeDisplayName이 영문으로 온다.
@@ -130,6 +136,8 @@ export function createGoogleFetcher(googlePlacesApiKey: string): NearbyDeps['fet
       lng: place.location?.longitude,
       googleRating: place.rating ?? null,
       googleRatingsTotal: place.userRatingCount ?? 0,
+      priceLevel: place.priceLevel ?? null,
+      photoName: place.photos?.[0]?.name ?? null,
       distanceMeters: distanceMeters(lat, lng, place.location?.latitude, place.location?.longitude),
     }));
   };
@@ -160,7 +168,7 @@ if (import.meta.main) {
       const { data, error } = await supabase
         .from('restaurants')
         .select(
-          'place_id,name,category,category_label,lat,lng,google_rating,google_ratings_total,fetched_at',
+          'place_id,name,category,category_label,lat,lng,google_rating,google_ratings_total,price_level,photo_name,fetched_at',
         )
         .gte('fetched_at', cutoff);
       if (error) throw error;
@@ -175,6 +183,8 @@ if (import.meta.main) {
           lng: row.lng,
           googleRating: row.google_rating,
           googleRatingsTotal: row.google_ratings_total,
+          priceLevel: row.price_level ?? null,
+          photoName: row.photo_name ?? null,
           distanceMeters: distanceMeters(lat, lng, row.lat, row.lng),
         }))
         .filter((row) => row.distanceMeters <= radius);
@@ -192,6 +202,8 @@ if (import.meta.main) {
           lng: row.lng,
           google_rating: row.googleRating,
           google_ratings_total: row.googleRatingsTotal,
+          price_level: row.priceLevel,
+          photo_name: row.photoName,
           fetched_at: new Date().toISOString(),
         })),
       );

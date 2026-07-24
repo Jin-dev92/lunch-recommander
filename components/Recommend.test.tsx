@@ -28,11 +28,21 @@ const restaurant = {
   lng: 127,
   googleRating: 4,
   googleRatingsTotal: 10,
+  priceLevel: null,
+  photoName: null,
   distanceMeters: 50,
 };
 
 function mockNearby(restaurants: unknown[]) {
   return { data: { restaurants, source: 'cache' } };
+}
+
+// nearby와 place-photo가 같은 axiosInstance.post를 쓰므로 경로로 응답을 나눈다.
+function mockPostByRoute(restaurants: unknown[], photoUri?: string) {
+  post.mockImplementation((url: string) => {
+    if (url === '/place-photo') return Promise.resolve({ data: { photoUri } });
+    return Promise.resolve(mockNearby(restaurants));
+  });
 }
 
 function mockTables(
@@ -68,6 +78,37 @@ describe('추천 실행', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: '식당' })).toBeInTheDocument());
     expect(screen.getByText('한식 · 50m')).toBeInTheDocument();
     expect(post).toHaveBeenCalledWith('/nearby', location);
+  });
+
+  it('가격대가 있으면 카테고리·거리와 함께 ₩ 기호로 보여줍니다', async () => {
+    mockPostByRoute([{ ...restaurant, priceLevel: 'PRICE_LEVEL_MODERATE' }]);
+    mockTables();
+    renderWithQuery(<Recommend location={location} />);
+    fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
+    await waitFor(() => expect(screen.getByText('한식 · ₩₩ · 50m')).toBeInTheDocument());
+  });
+
+  it('사진이 있으면 썸네일을 조회해 이름 옆에 보여줍니다', async () => {
+    mockPostByRoute(
+      [{ ...restaurant, photoName: 'places/p1/photos/x' }],
+      'https://lh3.googleusercontent.com/photo',
+    );
+    mockTables();
+    renderWithQuery(<Recommend location={location} />);
+    fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
+    const img = (await screen.findByRole('img')) as HTMLImageElement;
+    expect(img.src).toBe('https://lh3.googleusercontent.com/photo');
+    expect(post).toHaveBeenCalledWith('/place-photo', { photoName: 'places/p1/photos/x' });
+  });
+
+  it('사진 정보가 없으면 썸네일을 조회하지 않습니다', async () => {
+    post.mockResolvedValue(mockNearby([restaurant]));
+    mockTables();
+    renderWithQuery(<Recommend location={location} />);
+    fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: '식당' })).toBeInTheDocument());
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(post).not.toHaveBeenCalledWith('/place-photo', expect.anything());
   });
 
   it('위치가 없으면 버튼이 비활성화됩니다', () => {

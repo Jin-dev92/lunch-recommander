@@ -5,6 +5,7 @@ import { supabase } from '../supabaseClient';
 import type {
   CategoryPrefRow,
   NearbyResponse,
+  PlacePhotoResponse,
   RatingRow,
   RecommendationData,
   SearchLocation,
@@ -36,4 +37,15 @@ export async function getRecommendationData(location: SearchLocation): Promise<R
     ratings: unwrap<RatingRow[]>(ratings) ?? [],
     prefs: unwrap<CategoryPrefRow[]>(prefs) ?? [],
   };
+}
+
+/**
+ * 추천된 한 곳의 사진 URL을 가져온다. 사진 조회는 별도 과금(GetPhotoMedia)이라 20곳 전부가
+ * 아니라 추천 결과에 대해서만, 그것도 photoName이 있을 때만 호출한다.
+ */
+export async function getPlacePhotoUri(photoName: string): Promise<string> {
+  const { data } = await axiosInstance.post<PlacePhotoResponse>(API_ROUTES.PLACE_PHOTO, {
+    photoName,
+  });
+  return data.photoUri;
 }
