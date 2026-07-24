@@ -1,5 +1,6 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { checkRateLimit, type UsageStore } from '../_shared/rateLimit.ts';
+import { withCors } from '../_shared/cors.ts';
 
 export type NearbyRestaurant = {
   placeId: string;
@@ -186,5 +187,5 @@ if (import.meta.main) {
     },
   };
 
-  Deno.serve(createNearbyHandler(deps));
+  Deno.serve(withCors(createNearbyHandler(deps)));
 }
