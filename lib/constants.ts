@@ -13,8 +13,22 @@ export const ROUTES = {
 // axiosInstance의 baseURL(Supabase Functions) 기준 상대 경로
 export const API_ROUTES = {
   NEARBY: '/nearby',
+  PLACE_PHOTO: '/place-photo',
   SIGNUP_REQUEST: '/signup-request',
 } as const;
+
+// Google priceLevel 열거형을 ₩ 기호로 환산한다. Google은 실제 메뉴 가격이 아니라
+// 이 4단계 등급만 제공한다. 등급이 없거나 무료면 표시하지 않는다.
+const PRICE_LEVEL_SYMBOLS: Record<string, string> = {
+  PRICE_LEVEL_INEXPENSIVE: '₩',
+  PRICE_LEVEL_MODERATE: '₩₩',
+  PRICE_LEVEL_EXPENSIVE: '₩₩₩',
+  PRICE_LEVEL_VERY_EXPENSIVE: '₩₩₩₩',
+};
+
+export function priceLevelSymbol(priceLevel: string | null): string {
+  return priceLevel ? (PRICE_LEVEL_SYMBOLS[priceLevel] ?? '') : '';
+}
 
 export const TABLE = {
   RATINGS: 'ratings',

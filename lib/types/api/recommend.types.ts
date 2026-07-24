@@ -16,12 +16,21 @@ export type NearbyRestaurant = {
   lng: number;
   googleRating: number | null;
   googleRatingsTotal: number;
+  /** Google priceLevel 열거형(PRICE_LEVEL_MODERATE 등). 실제 가격이 아니라 4단계 등급. */
+  priceLevel: string | null;
+  /** Google 사진 리소스 이름. 실제 이미지는 place-photo가 해석한다. 추천된 1곳만 조회한다. */
+  photoName: string | null;
   distanceMeters: number;
 };
 
 export type NearbyResponse = {
   restaurants: NearbyRestaurant[];
   source: 'cache' | 'google';
+};
+
+/** @see POST /functions/v1/place-photo */
+export type PlacePhotoResponse = {
+  photoUri: string;
 };
 
 /** 추천 한 번에 필요한 원본 데이터 묶음. 점수 계산·추첨은 lib/recommend.ts가 담당한다. */
