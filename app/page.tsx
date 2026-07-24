@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import Link from 'next/link';
+import GroupManager from '../components/GroupManager';
 import Map from '../components/Map';
 import Recommend from '../components/Recommend';
 import { ROUTES, SESSION_COOKIE } from '../lib/constants';
@@ -27,9 +27,7 @@ export default function HomePage() {
       <header className={styles.header}>
         <h1 className={styles.title}>점심 추천</h1>
         <nav className={styles.actions}>
-          <Link className={styles.secondaryAction} href={ROUTES.GROUPS}>
-            그룹 관리
-          </Link>
+          <GroupManager />
           <button className={styles.secondaryAction} onClick={logout} disabled={signOut.isPending}>
             로그아웃
           </button>
