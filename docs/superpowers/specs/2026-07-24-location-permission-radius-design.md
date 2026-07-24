@@ -98,7 +98,7 @@ Permissions API는 지원되는 브라우저에서만 보조 신호로 사용한
 | 조건 | 허용 값 | 기본값 |
 | --- | --- | --- |
 | 최소 Google 평점 | 3.5, 4.0, 4.5, 5.0 | 3.5 |
-| 최소 Google 리뷰 수 | 10, 30, 50, 70, 100 | 10 |
+| 최소 Google 리뷰 수 | 10, 30, 50, 70, 100 | 30 |
 
 추천 조건은 위치 요청 모델과 분리한 `RecommendationCriteria` 타입으로 관리한다.
 `SearchLocation`에는 좌표와 반경만 유지해 `nearby` Edge Function 요청에 프론트엔드
