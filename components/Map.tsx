@@ -52,15 +52,18 @@ export default function Map({
     let cancelled = false;
 
     (async () => {
-      const { Map: GoogleMap } = (await google.maps.importLibrary(
-        'maps',
-      )) as google.maps.MapsLibrary;
+      // loading=async는 요청한 라이브러리만 로드한다. Marker는 maps가 아니라 marker
+      // 라이브러리 소속이므로 함께 가져오지 않으면 google.maps.Marker가 undefined다.
+      const [{ Map: GoogleMap }, { Marker }] = await Promise.all([
+        google.maps.importLibrary('maps') as Promise<google.maps.MapsLibrary>,
+        google.maps.importLibrary('marker') as Promise<google.maps.MarkerLibrary>,
+      ]);
       // 라이브러리를 기다리는 사이 언마운트됐거나 다른 경로로 이미 만들어졌으면 중단한다.
       if (cancelled || mapRef.current || !node.current) return;
 
       const map = new GoogleMap(node.current, { center: coords, zoom: 16 });
       // 고정밀 측위도 실내나 데스크톱에서는 빗나가므로 사용자가 직접 보정할 수 있어야 한다.
-      const marker = new google.maps.Marker({
+      const marker = new Marker({
         position: coords,
         map,
         draggable: true,
