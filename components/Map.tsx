@@ -1,11 +1,20 @@
 'use client';
 
+import Script from 'next/script';
 import { useEffect, useRef, useState } from 'react';
 import type { SearchLocation } from '../lib/types/api';
 import { MESSAGES } from '../lib/messages';
 import styles from './Map.module.css';
 
 type Coords = { lat: number; lng: number };
+
+// loading=async는 Google이 권장하는 로딩 방식이다(생략하면 콘솔 경고가 뜬다). 대신 스크립트가
+// 비동기로 들어오므로 google 전역이 언제 준비되는지 알 수 없어, onReady + importLibrary로 기다린다.
+// language/region은 지도 위 라벨을 한국어·한국 기준으로 맞춘다.
+const MAPS_SCRIPT_SRC =
+  'https://maps.googleapis.com/maps/api/js' +
+  `?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}` +
+  '&loading=async&language=ko&region=KR';
 
 export default function Map({
   onLocationChange,
@@ -15,6 +24,7 @@ export default function Map({
   const node = useRef<HTMLDivElement>(null);
   // 지도 인스턴스는 최초 1회만 만든다. 이 ref가 "이미 생성됨" 표시 역할도 한다.
   const mapRef = useRef<google.maps.Map | null>(null);
+  const [sdkReady, setSdkReady] = useState(false);
   const [radius, setRadius] = useState<500 | 1000>(500);
   const [coords, setCoords] = useState<Coords | null>(null);
   const [error, setError] = useState('');
@@ -35,33 +45,50 @@ export default function Map({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coords?.lat, coords?.lng, radius]);
 
-  // 좌표가 처음 정해질 때 지도를 만든다. 이후 좌표 변경(핀 이동)으로는 다시 만들지 않는다.
-  // 고정밀 측위도 실내나 데스크톱에서는 빗나가므로 사용자가 직접 보정할 수 있어야 한다.
+  // 좌표와 SDK가 모두 준비됐을 때 지도를 만든다. 둘 중 어느 쪽이 먼저 와도 상관없다.
+  // 이후 좌표 변경(핀 이동)으로는 다시 만들지 않는다.
   useEffect(() => {
-    if (!coords || mapRef.current) return;
-    if (typeof google === 'undefined' || !google.maps) {
-      setError(MESSAGES.MAP_LOAD_FAILED);
-      return;
-    }
-    const map = new google.maps.Map(node.current!, { center: coords, zoom: 16 });
-    const marker = new google.maps.Marker({
-      position: coords,
-      map,
-      draggable: true,
-      title: MESSAGES.MAP_ADJUST_HINT,
-    });
-    const moveTo = (latLng: google.maps.LatLng | null) => {
-      if (!latLng) return;
-      marker.setPosition(latLng);
-      setCoords({ lat: latLng.lat(), lng: latLng.lng() });
+    if (!coords || !sdkReady || mapRef.current) return;
+    let cancelled = false;
+
+    (async () => {
+      const { Map: GoogleMap } = (await google.maps.importLibrary(
+        'maps',
+      )) as google.maps.MapsLibrary;
+      // 라이브러리를 기다리는 사이 언마운트됐거나 다른 경로로 이미 만들어졌으면 중단한다.
+      if (cancelled || mapRef.current || !node.current) return;
+
+      const map = new GoogleMap(node.current, { center: coords, zoom: 16 });
+      // 고정밀 측위도 실내나 데스크톱에서는 빗나가므로 사용자가 직접 보정할 수 있어야 한다.
+      const marker = new google.maps.Marker({
+        position: coords,
+        map,
+        draggable: true,
+        title: MESSAGES.MAP_ADJUST_HINT,
+      });
+      const moveTo = (latLng: google.maps.LatLng | null) => {
+        if (!latLng) return;
+        marker.setPosition(latLng);
+        setCoords({ lat: latLng.lat(), lng: latLng.lng() });
+      };
+      marker.addListener('dragend', (event: google.maps.MapMouseEvent) => moveTo(event.latLng));
+      map.addListener('click', (event: google.maps.MapMouseEvent) => moveTo(event.latLng));
+      mapRef.current = map;
+    })().catch(() => setError(MESSAGES.MAP_LOAD_FAILED));
+
+    return () => {
+      cancelled = true;
     };
-    marker.addListener('dragend', (event: google.maps.MapMouseEvent) => moveTo(event.latLng));
-    map.addListener('click', (event: google.maps.MapMouseEvent) => moveTo(event.latLng));
-    mapRef.current = map;
-  }, [coords]);
+  }, [coords, sdkReady]);
 
   return (
     <section className={styles.section}>
+      <Script
+        src={MAPS_SCRIPT_SRC}
+        strategy="afterInteractive"
+        onReady={() => setSdkReady(true)}
+        onError={() => setError(MESSAGES.MAP_LOAD_FAILED)}
+      />
       <label className={styles.radiusField}>
         검색 반경
         <select
