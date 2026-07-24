@@ -107,6 +107,51 @@ Deno.test('본문이 올바른 JSON이 아니면 400입니다', async () => {
   );
   assertEquals(response.status, 400);
 });
+Deno.test('100m와 300m 검색 반경을 허용합니다', async () => {
+  const received: number[] = [];
+  const handler = createNearbyHandler({
+    authenticate: async () => ({ id: 'u1' }),
+    checkLimit: async () => true,
+    findCached: async (_lat, _lng, radius) => {
+      received.push(radius);
+      return [];
+    },
+    fetchGoogle: async () => [],
+    upsert: async () => {},
+  });
+
+  for (const radius of [100, 300]) {
+    const response = await handler(
+      new Request('http://local', {
+        method: 'POST',
+        headers: { authorization: 'Bearer jwt', 'x-forwarded-for': '127.0.0.1' },
+        body: JSON.stringify({ lat: 37, lng: 127, radius }),
+      }),
+    );
+    assertEquals(response.status, 200);
+  }
+  assertEquals(received, [100, 300]);
+});
+Deno.test('허용 목록에 없는 검색 반경은 400입니다', async () => {
+  const handler = createNearbyHandler({
+    authenticate: async () => ({ id: 'u1' }),
+    checkLimit: async () => true,
+    findCached: async () => [],
+    fetchGoogle: async () => [],
+    upsert: async () => {},
+  });
+
+  for (const radius of [200, 2000]) {
+    const response = await handler(
+      new Request('http://local', {
+        method: 'POST',
+        headers: { authorization: 'Bearer jwt', 'x-forwarded-for': '127.0.0.1' },
+        body: JSON.stringify({ lat: 37, lng: 127, radius }),
+      }),
+    );
+    assertEquals(response.status, 400);
+  }
+});
 Deno.test('Google 조회 실패 시 빈 성공 응답이 아니라 오류 상태를 반환합니다', async () => {
   const handler = createNearbyHandler({
     authenticate: async () => ({ id: 'u1' }),

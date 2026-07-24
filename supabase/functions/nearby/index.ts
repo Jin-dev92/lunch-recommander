@@ -44,7 +44,7 @@ export function createNearbyHandler(deps: NearbyDeps) {
     if (
       !Number.isFinite(body.lat) ||
       !Number.isFinite(body.lng) ||
-      ![500, 1000].includes(body.radius)
+      ![100, 300, 500, 1000].includes(body.radius)
     )
       return Response.json({ error: '위치 또는 반경이 올바르지 않습니다.' }, { status: 400 });
     const cached = await deps.findCached(body.lat, body.lng, body.radius);
