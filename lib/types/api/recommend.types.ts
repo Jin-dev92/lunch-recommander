@@ -2,8 +2,19 @@
 import type { CategoryPrefRow } from './categoryPrefs.types';
 import type { RatingRow } from './ratings.types';
 
-/** 지도에서 고른 검색 위치. 반경은 Edge Function이 허용하는 두 값만 받는다. */
-export type SearchLocation = { lat: number; lng: number; radius: 500 | 1000 };
+/** 지도에서 고른 검색 위치. 반경은 Edge Function이 허용하는 네 값만 받는다. */
+export type SearchLocation = { lat: number; lng: number; radius: 100 | 300 | 500 | 1000 };
+
+export type MinimumGoogleRating = 3.5 | 4 | 4.5 | 5;
+export type MinimumGoogleReviews = 10 | 30 | 50 | 70 | 100;
+export type RecommendationCriteria = {
+  minGoogleRating: MinimumGoogleRating;
+  minGoogleReviews: MinimumGoogleReviews;
+};
+export const DEFAULT_RECOMMENDATION_CRITERIA: RecommendationCriteria = {
+  minGoogleRating: 3.5,
+  minGoogleReviews: 30,
+};
 
 export type NearbyRestaurant = {
   placeId: string;

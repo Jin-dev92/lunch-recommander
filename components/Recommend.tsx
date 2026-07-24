@@ -10,11 +10,16 @@ import {
   scoreCandidate,
   type Candidate,
 } from '../lib/recommend';
-import type { SearchLocation } from '../lib/types/api';
+import {
+  DEFAULT_RECOMMENDATION_CRITERIA,
+  type RecommendationCriteria,
+  type SearchLocation,
+} from '../lib/types/api';
 import { ROUTES } from '../lib/constants';
 import Link from 'next/link';
 import RatingControls from './RatingControls';
 import CategoryPrefs from './CategoryPrefs';
+import Spinner from './Spinner';
 import styles from './Recommend.module.css';
 
 type Result = Candidate & {
@@ -27,9 +32,11 @@ type Result = Candidate & {
 
 export default function Recommend({
   location,
+  criteria = DEFAULT_RECOMMENDATION_CRITERIA,
   canRate,
 }: {
   location: SearchLocation | null;
+  criteria?: RecommendationCriteria;
   // 로그인한 실사용자만 평가할 수 있다. 익명 사용자는 추천만 보고 평가 UI는 로그인 유도로 대체한다.
   canRate: boolean;
 }) {
@@ -53,13 +60,15 @@ export default function Recommend({
     setUserId(data.userId);
     const merged = mergeCandidates(data.restaurants, data.ratings, data.prefs, data.userId);
     setCategoryWeights(merged.categoryWeights);
-    const candidates = filterCandidates(merged.candidates, new Date()).map((candidate) => ({
-      ...candidate,
-      weight: scoreCandidate(candidate, {
-        categoryWeights: merged.categoryWeights,
-        maxDistanceMeters: location.radius,
+    const candidates = filterCandidates(merged.candidates, new Date(), criteria).map(
+      (candidate) => ({
+        ...candidate,
+        weight: scoreCandidate(candidate, {
+          categoryWeights: merged.categoryWeights,
+          maxDistanceMeters: location.radius,
+        }),
       }),
-    }));
+    );
     const picked = pickWeightedRandom(candidates, Math.random);
     if (!picked) return setError(MESSAGES.NO_CANDIDATES);
     setResult(picked);
@@ -68,7 +77,14 @@ export default function Recommend({
   return (
     <section className={styles.section} aria-busy={isFetching}>
       <button className={styles.primaryButton} onClick={run} disabled={!location || isFetching}>
-        한 곳 추천
+        {isFetching ? (
+          <>
+            <Spinner />
+            추천 중…
+          </>
+        ) : (
+          '한 곳 추천'
+        )}
       </button>
       {result && (
         <article className={styles.result}>

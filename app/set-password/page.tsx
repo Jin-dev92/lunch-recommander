@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { ROUTES } from '../../lib/constants';
 import { supabase } from '../../lib/supabaseClient';
 import styles from '../login/login.module.css';
+import Spinner from '../../components/Spinner';
 
 export default function SetPasswordPage() {
   const [ready, setReady] = useState(false);
@@ -107,7 +108,14 @@ export default function SetPasswordPage() {
             disabled={loading || success}
             aria-busy={loading}
           >
-            {loading ? '설정 중…' : '비밀번호 설정'}
+            {loading ? (
+              <>
+                <Spinner />
+                설정 중…
+              </>
+            ) : (
+              '비밀번호 설정'
+            )}
           </button>
           {message && <p role="status">{message}</p>}
           {error && (

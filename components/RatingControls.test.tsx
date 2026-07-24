@@ -146,4 +146,16 @@ describe('평점 저장', () => {
     fireEvent.click(screen.getByRole('button', { name: '3점' }));
     await screen.findByRole('alert');
   });
+
+  it('평점 저장 중 컨트롤 영역에 공통 스피너를 한 번 보여줍니다', async () => {
+    const upsert = vi.fn().mockReturnValue(new Promise(() => {}));
+    from.mockImplementation(() => ({ upsert }));
+    renderWithQuery(<RatingControls placeId="p1" userId="me" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '3점' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('저장 중…');
+    expect(screen.getAllByTestId('spinner')).toHaveLength(1);
+    expect(screen.getByLabelText('개인 평점')).toHaveAttribute('aria-busy', 'true');
+  });
 });

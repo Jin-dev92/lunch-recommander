@@ -6,12 +6,17 @@
   box-shadow: var(--shadow-card);
 }
 
-.radiusField {
+.searchFields {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.searchField {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 12px;
   font-size: 14px;
   font-weight: 600;
 }
@@ -66,7 +71,43 @@
   line-height: 1.5;
 }
 
+.retryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.retryButton:disabled {
+  cursor: wait;
+}
+
+.retryButton:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
 @media (min-width: 640px) {
+  .searchFields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .searchField {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .select {
+    width: 100%;
+  }
+
   .map {
     height: 260px;
   }

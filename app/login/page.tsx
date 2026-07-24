@@ -6,6 +6,7 @@ import { useRequestSignup, useSignIn } from '../../lib/hooks/mutations';
 import { errorMessage } from '../../lib/messages';
 import type { SignInRequest, SignupRequest } from '../../lib/types/api';
 import styles from './login.module.css';
+import Spinner from '../../components/Spinner';
 
 export default function LoginPage() {
   const signInForm = useForm<SignInRequest>();
@@ -66,7 +67,14 @@ export default function LoginPage() {
             disabled={signIn.isPending}
             aria-busy={signIn.isPending}
           >
-            {signIn.isPending ? '로그인 중…' : '로그인'}
+            {signIn.isPending ? (
+              <>
+                <Spinner />
+                로그인 중…
+              </>
+            ) : (
+              '로그인'
+            )}
           </button>
           {signIn.isError && (
             <p className={styles.error} role="alert">
@@ -106,7 +114,14 @@ export default function LoginPage() {
             disabled={requestSignup.isPending}
             aria-busy={requestSignup.isPending}
           >
-            {requestSignup.isPending ? '요청 중…' : '요청 보내기'}
+            {requestSignup.isPending ? (
+              <>
+                <Spinner />
+                요청 중…
+              </>
+            ) : (
+              '요청 보내기'
+            )}
           </button>
           {requestSignup.isSuccess && (
             <p className={styles.notice} role="status">

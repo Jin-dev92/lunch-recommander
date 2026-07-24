@@ -4,6 +4,7 @@ import { EXCLUDE_RATING_SCORE, MAX_STAR_SCORE, MIN_STAR_SCORE } from '../lib/con
 import { useSaveRating, useSnoozeRating } from '../lib/hooks/mutations';
 import { MESSAGES } from '../lib/messages';
 import styles from './RatingControls.module.css';
+import Spinner from './Spinner';
 
 const STAR_SCORES = Array.from(
   { length: MAX_STAR_SCORE - MIN_STAR_SCORE + 1 },
@@ -61,6 +62,12 @@ export default function RatingControls({
 
   return (
     <section className={styles.section} aria-label="개인 평점" aria-busy={isPending}>
+      {isPending && (
+        <p className={styles.pendingStatus} role="status">
+          <Spinner />
+          저장 중…
+        </p>
+      )}
       <div className={styles.scoreGrid} role="group" aria-label="별점">
         {STAR_SCORES.map((value) => {
           const filled = score !== null && value <= score;

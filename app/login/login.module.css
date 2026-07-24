@@ -25,6 +25,14 @@
   text-align: center;
 }
 
+.loadingStatus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--color-text-muted);
+}
+
 .form {
   display: flex;
   flex-direction: column;
@@ -57,6 +65,10 @@
 }
 
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   margin-top: 8px;
   padding: 12px 14px;
   font-size: 15px;
