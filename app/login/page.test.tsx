@@ -72,13 +72,45 @@ describe('로그인', () => {
     expect(document.cookie).not.toContain('sb-session=1');
   });
 
-  it('회원가입 요청 성공 안내를 표시합니다', async () => {
-    post.mockResolvedValue({ data: { message: '승인되면 메일로 안내됩니다' } });
+  it('회원가입 요청 폼은 모달을 열기 전에는 보이지 않습니다', () => {
     renderWithQuery(<LoginPage />);
-    fireEvent.change(screen.getByLabelText('회원가입 요청 이메일'), {
-      target: { value: 'guest@example.com' },
-    });
-    fireEvent.submit(screen.getByRole('button', { name: '회원가입 요청' }).closest('form')!);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '회원가입 요청' })).toBeInTheDocument();
+  });
+});
+
+describe('회원가입 요청 모달', () => {
+  beforeEach(() => {
+    signInWithPassword.mockReset();
+    post.mockReset();
+  });
+
+  function openModal() {
+    renderWithQuery(<LoginPage />);
+    fireEvent.click(screen.getByRole('button', { name: '회원가입 요청' }));
+  }
+
+  function submitRequest(email = 'guest@example.com') {
+    fireEvent.change(screen.getByLabelText('회원가입 요청 이메일'), { target: { value: email } });
+    fireEvent.submit(screen.getByRole('button', { name: '요청 보내기' }).closest('form')!);
+  }
+
+  it('회원가입 요청 버튼을 누르면 모달이 열립니다', () => {
+    openModal();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByLabelText('회원가입 요청 이메일')).toBeInTheDocument();
+  });
+
+  it('닫기를 누르면 모달이 닫힙니다', () => {
+    openModal();
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('요청 성공 안내를 표시합니다', async () => {
+    post.mockResolvedValue({ data: { message: '승인되면 메일로 안내됩니다' } });
+    openModal();
+    submitRequest();
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent('승인되면 메일로 안내됩니다'),
     );
@@ -87,15 +119,25 @@ describe('로그인', () => {
     });
   });
 
-  it('회원가입 요청 오류를 alert로 표시합니다', async () => {
+  it('요청 오류를 alert로 표시합니다', async () => {
     post.mockRejectedValue(new Error('요청 한도를 초과했습니다.'));
-    renderWithQuery(<LoginPage />);
-    fireEvent.change(screen.getByLabelText('회원가입 요청 이메일'), {
-      target: { value: 'guest@example.com' },
-    });
-    fireEvent.submit(screen.getByRole('button', { name: '회원가입 요청' }).closest('form')!);
+    openModal();
+    submitRequest();
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('요청 한도를 초과했습니다.'),
     );
+  });
+
+  it('닫았다가 다시 열면 이전 결과가 남지 않습니다', async () => {
+    post.mockResolvedValue({ data: { message: '승인되면 메일로 안내됩니다' } });
+    openModal();
+    submitRequest();
+    await screen.findByRole('status');
+
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+    fireEvent.click(screen.getByRole('button', { name: '회원가입 요청' }));
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('회원가입 요청 이메일')).toHaveValue('');
   });
 });

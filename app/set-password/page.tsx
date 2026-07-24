@@ -1,5 +1,6 @@
 'use client';
 import { FormEvent, useEffect, useState } from 'react';
+import { ROUTES, SESSION_COOKIE, SESSION_COOKIE_MAX_AGE_SECONDS } from '../../lib/constants';
 import { supabase } from '../../lib/supabaseClient';
 import styles from '../login/login.module.css';
 
@@ -35,8 +36,12 @@ export default function SetPasswordPage() {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) setError(error.message);
       else {
-        setMessage('비밀번호를 설정했습니다. 이제 로그인할 수 있습니다.');
+        setMessage('비밀번호를 설정했습니다. 잠시 후 이동합니다.');
         setSuccess(true);
+        // 초대 링크로 이미 세션이 서 있으므로 다시 로그인시키지 않는다. 미들웨어가 확인하는
+        // 마커 쿠키만 심어 주고 메인으로 보낸다(로그인 화면과 동일한 방식).
+        document.cookie = `${SESSION_COOKIE}=1; path=/; max-age=${SESSION_COOKIE_MAX_AGE_SECONDS}; samesite=lax`;
+        location.assign(ROUTES.HOME);
       }
     } catch {
       setError('비밀번호 설정 중 오류가 발생했습니다. 다시 시도해 주세요.');
