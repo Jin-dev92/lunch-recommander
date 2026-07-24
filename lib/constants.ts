@@ -1,13 +1,8 @@
 // 여러 파일이 공유하는 식별자 단일 출처. 사용자 노출 문구는 lib/messages.ts에 둔다.
 
-// 로그인 시 클라이언트가 심고 미들웨어가 존재 여부만 확인하는 세션 마커 쿠키
-export const SESSION_COOKIE = 'sb-session';
-export const SESSION_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
-
 export const ROUTES = {
   HOME: '/',
   LOGIN: '/login',
-  GROUPS: '/groups',
 } as const;
 
 // axiosInstance의 baseURL(Supabase Functions) 기준 상대 경로

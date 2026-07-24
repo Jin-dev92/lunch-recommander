@@ -47,12 +47,11 @@ describe('로그인', () => {
     expect(screen.getByRole('button', { name: '로그인' })).toBeInTheDocument();
   });
 
-  it('로그인 성공 시 세션 쿠키를 심고 이동합니다', async () => {
+  it('로그인 성공 시 홈으로 이동합니다', async () => {
     signInWithPassword.mockResolvedValue({ error: null });
     renderWithQuery(<LoginPage />);
     fillAndSubmit();
     await waitFor(() => expect(assign).toHaveBeenCalledWith('/'));
-    expect(document.cookie).toContain('sb-session=1');
     expect(signInWithPassword).toHaveBeenCalledWith({
       email: 'a@b.com',
       password: 'password1',
@@ -69,7 +68,6 @@ describe('로그인', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('잘못된 비밀번호입니다'),
     );
     expect(assign).not.toHaveBeenCalled();
-    expect(document.cookie).not.toContain('sb-session=1');
   });
 
   it('회원가입 요청 폼은 모달을 열기 전에는 보이지 않습니다', () => {
