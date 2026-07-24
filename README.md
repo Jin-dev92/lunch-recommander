@@ -61,16 +61,18 @@
 
 화면 컴포넌트는 데이터 접근 코드를 직접 갖지 않고 레이어를 거칩니다. 의존 방향은 아래 한 방향뿐입니다.
 
-```
-컴포넌트 (app/, components/)
-    │  훅만 호출한다
-    ▼
-훅 (lib/hooks/queries, lib/hooks/mutations)
-    │  API 함수만 호출한다
-    ▼
-API 함수 (lib/api/)
-    ├──▶ supabaseClient  … 데이터베이스 질의와 인증
-    └──▶ axiosInstance   … 자체 HTTP 엔드포인트(Edge Function)
+```mermaid
+flowchart TD
+    components["컴포넌트<br/>(app/, components/)"]
+    hooks["훅<br/>(lib/hooks/queries, lib/hooks/mutations)"]
+    api["API 함수<br/>(lib/api/)"]
+    supabase["supabaseClient<br/>데이터베이스 질의와 인증"]
+    axios["axiosInstance<br/>자체 HTTP 엔드포인트(Edge Function)"]
+
+    components -->|"훅만 호출한다"| hooks
+    hooks -->|"API 함수만 호출한다"| api
+    api --> supabase
+    api --> axios
 ```
 
 식별자(쿠키명·테이블·경로 등)는 `lib/constants.ts`, 사용자 노출 문구는 `lib/messages.ts`로 각각 단일화합니다.
