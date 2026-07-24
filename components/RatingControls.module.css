@@ -5,12 +5,13 @@
 
 .scoreGrid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
 }
 
 .scoreButton,
-.snoozeButton {
+.snoozeButton,
+.excludeButton {
   min-height: 44px;
   color: var(--color-text);
   background: var(--color-surface);
@@ -35,35 +36,67 @@
 }
 
 .scoreButton:hover:not(:disabled),
-.snoozeButton:hover:not(:disabled) {
+.snoozeButton:hover:not(:disabled),
+.excludeButton:hover:not(:disabled) {
   color: var(--color-accent-hover);
   background: var(--color-accent-soft);
   border-color: var(--color-accent);
 }
 
 .scoreButton:active:not(:disabled),
-.snoozeButton:active:not(:disabled) {
+.snoozeButton:active:not(:disabled),
+.excludeButton:active:not(:disabled) {
   transform: scale(0.98);
 }
 
 .scoreButton:focus-visible,
-.snoozeButton:focus-visible {
+.snoozeButton:focus-visible,
+.excludeButton:focus-visible {
   outline: none;
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
 }
 
 .scoreButton:disabled,
-.snoozeButton:disabled {
+.snoozeButton:disabled,
+.excludeButton:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }
 
-.snoozeButton {
-  width: 100%;
+.filled {
+  color: var(--color-surface);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.scoreButton[aria-pressed='true'] {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  box-shadow: inset 0 0 0 1px var(--color-surface);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
   margin-top: 10px;
+}
+
+.snoozeButton,
+.excludeButton {
+  width: 100%;
   padding: 0 14px;
+}
+
+.snoozeButton {
   color: var(--color-text-muted);
+}
+
+.excludeButton {
+  color: var(--color-accent-hover);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
 }
 
 .error {
@@ -98,7 +131,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .scoreButton,
-  .snoozeButton {
+  .snoozeButton,
+  .excludeButton {
     transition: none;
   }
 }

@@ -14,7 +14,7 @@ import RatingControls from './RatingControls';
 import CategoryPrefs from './CategoryPrefs';
 import styles from './Recommend.module.css';
 
-type Result = Candidate & { name: string; weight: number };
+type Result = Candidate & { name: string; categoryLabel: string; weight: number };
 
 export default function Recommend({ location }: { location: SearchLocation | null }) {
   const [result, setResult] = useState<Result | null>(null);
@@ -56,13 +56,21 @@ export default function Recommend({ location }: { location: SearchLocation | nul
         <article className={styles.result}>
           <h2 className={styles.name}>{result.name}</h2>
           <p className={styles.meta}>
-            {result.category} · {Math.round(result.distanceMeters)}m
+            {result.categoryLabel} · {Math.round(result.distanceMeters)}m
           </p>
-          <RatingControls placeId={result.placeId} userId={userId} />
-          <CategoryPrefs
+          {/* 두 컴포넌트는 선택 상태를 들고 있으므로 대상이 바뀌면 remount해 이전 선택을 지운다. */}
+          <RatingControls
+            key={result.placeId}
+            placeId={result.placeId}
             userId={userId}
-            categories={[result.category]}
-            currentWeights={categoryWeights}
+            currentScore={result.personalRating}
+          />
+          <CategoryPrefs
+            key={result.category}
+            userId={userId}
+            category={result.category}
+            categoryLabel={result.categoryLabel}
+            currentWeight={categoryWeights[result.category]}
           />
         </article>
       )}

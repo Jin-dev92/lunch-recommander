@@ -39,7 +39,7 @@ describe('평점 저장', () => {
     from.mockReset();
   });
 
-  it.each([0, 1, 2, 3, 4, 5])('%i점 버튼을 누르면 해당 점수로 upsert됩니다', async (score) => {
+  it.each([1, 2, 3, 4, 5])('별 %i개를 누르면 해당 점수로 upsert됩니다', async (score) => {
     const { upsert } = mockRatings();
     renderWithQuery(<RatingControls placeId="p1" userId="me" />);
     fireEvent.click(screen.getByRole('button', { name: `${score}점` }));
@@ -49,6 +49,33 @@ describe('평점 저장', () => {
         { onConflict: 'user_id,place_id' },
       ),
     );
+  });
+
+  it('별점에는 0점 버튼이 없습니다', () => {
+    mockRatings();
+    renderWithQuery(<RatingControls placeId="p1" userId="me" />);
+    // 0점은 "별 0개"가 아니라 영구 제외라, 별에 섞으면 맛없음 표시로 오해된다.
+    expect(screen.queryByRole('button', { name: '0점' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^[1-5]점$/ })).toHaveLength(5);
+  });
+
+  it('"다시 추천 안 함"을 누르면 0점(영구 제외)으로 저장합니다', async () => {
+    const { upsert } = mockRatings();
+    renderWithQuery(<RatingControls placeId="p1" userId="me" />);
+    fireEvent.click(screen.getByRole('button', { name: '다시 추천 안 함' }));
+    await vi.waitFor(() =>
+      expect(upsert).toHaveBeenCalledWith(
+        { user_id: 'me', place_id: 'p1', score: 0 },
+        { onConflict: 'user_id,place_id' },
+      ),
+    );
+  });
+
+  it('기존 평점을 별의 채움 상태로 반영합니다', () => {
+    mockRatings();
+    renderWithQuery(<RatingControls placeId="p1" userId="me" currentScore={3} />);
+    expect(screen.getByRole('button', { name: '3점' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '4점' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('스누즈를 누르면 기존 점수를 보존하며 snoozed_until을 7일 뒤로 설정합니다', async () => {

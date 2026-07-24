@@ -8,7 +8,10 @@ export type SearchLocation = { lat: number; lng: number; radius: 500 | 1000 };
 export type NearbyRestaurant = {
   placeId: string;
   name: string;
+  /** Google primaryType(korean_restaurant 등). 선호 가중치의 저장 키이자 점수 계산 기준인 기계값. */
   category: string;
+  /** Google primaryTypeDisplayName(한식당 등). 화면 표시 전용이며 저장 키로 쓰지 않는다. */
+  categoryLabel: string;
   lat: number;
   lng: number;
   googleRating: number | null;
