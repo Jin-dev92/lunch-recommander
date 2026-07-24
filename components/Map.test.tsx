@@ -46,12 +46,16 @@ beforeEach(() => {
   markerMock.mockReset();
   mapMock.mockImplementation(() => ({ addListener }));
   markerMock.mockImplementation(() => ({ addListener, setPosition }));
+  // 실제 SDK는 loading=async에서 요청한 라이브러리만 채운다. Map은 'maps', Marker는 'marker'
+  // 소속이며 전역 google.maps에는 놓이지 않는다. 목이 전역에 다 얹어두면 라이브러리를
+  // 빠뜨린 코드가 테스트를 통과해 버리므로, 여기서도 importLibrary로만 제공한다.
   (globalThis as unknown as { google: typeof google }).google = {
     maps: {
-      Map: mapMock,
-      Marker: markerMock,
-      // loading=async 방식에서는 라이브러리를 importLibrary로 받아 온다.
-      importLibrary: vi.fn().mockResolvedValue({ Map: mapMock }),
+      importLibrary: vi.fn(async (name: string) => {
+        if (name === 'maps') return { Map: mapMock };
+        if (name === 'marker') return { Marker: markerMock };
+        throw new Error(`요청하지 않은 라이브러리: ${name}`);
+      }),
     },
   } as unknown as typeof google;
 });
@@ -160,13 +164,12 @@ describe('지도', () => {
   it('SDK가 좌표보다 늦게 준비돼도 지도를 만듭니다', async () => {
     // 예전 구현은 좌표가 오는 순간 한 번만 검사하고 실패로 확정해 다시 시도하지 않았다.
     let resolveLibrary: (value: unknown) => void = () => {};
+    const pending = new Promise((resolve) => {
+      resolveLibrary = resolve;
+    });
     (globalThis as unknown as { google: typeof google }).google.maps.importLibrary = vi
       .fn()
-      .mockReturnValue(
-        new Promise((resolve) => {
-          resolveLibrary = resolve;
-        }),
-      ) as unknown as typeof google.maps.importLibrary;
+      .mockReturnValue(pending) as unknown as typeof google.maps.importLibrary;
 
     const getCurrentPosition = vi.fn((success) =>
       success({ coords: { latitude: 37.5, longitude: 127.0 } }),
@@ -177,7 +180,7 @@ describe('지도', () => {
     expect(mapMock).not.toHaveBeenCalled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
-    resolveLibrary({ Map: mapMock });
+    resolveLibrary({ Map: mapMock, Marker: markerMock });
 
     await waitFor(() => expect(mapMock).toHaveBeenCalledTimes(1));
   });
