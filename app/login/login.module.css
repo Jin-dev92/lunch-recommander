@@ -185,6 +185,21 @@
   border-radius: 10px;
 }
 
+.confirmationEmail {
+  margin: 0;
+  font-weight: 600;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.resendHelp {
+  margin: -8px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+
 .error {
   margin: 0;
   padding: 10px 14px;

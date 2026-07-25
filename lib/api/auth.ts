@@ -1,6 +1,6 @@
 import { MESSAGES } from '../messages';
 import { signupSupabase, supabase } from '../supabaseClient';
-import type { SignInRequest, SignupRequest } from '../types/api';
+import type { ResendSignupEmailRequest, SignInRequest, SignupRequest } from '../types/api';
 import { assertNoError } from './unwrap';
 
 export type CurrentUser = { id: string; isAnonymous: boolean };
@@ -57,6 +57,21 @@ export async function signUp({
     }),
   );
   return MESSAGES.SIGNUP_CONFIRM_EMAIL;
+}
+
+export async function resendSignupEmail({
+  email,
+  captchaToken,
+  emailRedirectTo,
+}: ResendSignupEmailRequest): Promise<string> {
+  assertNoError(
+    await signupSupabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { captchaToken, emailRedirectTo },
+    }),
+  );
+  return MESSAGES.SIGNUP_CONFIRM_EMAIL_RESENT;
 }
 
 export async function signOut(): Promise<void> {
