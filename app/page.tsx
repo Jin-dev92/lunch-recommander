@@ -6,7 +6,6 @@ import Map from '../components/Map';
 import Recommend from '../components/Recommend';
 import Spinner from '../components/Spinner';
 import { ROUTES } from '../lib/constants';
-import { ensureSession } from '../lib/api';
 import { useAuth } from '../lib/hooks/useAuth';
 import { useSignOut } from '../lib/hooks/mutations';
 import { errorMessage } from '../lib/messages';
@@ -23,9 +22,8 @@ export default function HomePage() {
   const { isLoggedIn } = useAuth();
   const signOut = useSignOut();
 
-  // 로그아웃해도 앱은 공개라 로그인 화면으로 보내지 않는다. 세션만 익명으로 되돌려
-  // 계속 추천을 쓸 수 있게 한다. 헤더·평가 UI는 세션 변화 구독으로 자동 갱신된다.
-  const logout = () => signOut.mutate(undefined, { onSuccess: () => ensureSession() });
+  // 로그아웃 뒤 익명 세션 재발급은 전역 게이트가 새 Turnstile 토큰으로 처리한다.
+  const logout = () => signOut.mutate();
 
   return (
     <main className={styles.main}>
