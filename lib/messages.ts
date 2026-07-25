@@ -14,9 +14,6 @@ export const MESSAGES = {
   GROUP_JOINED: '그룹에 가입했습니다.',
   ALREADY_LOGGED_IN: '이미 로그인되어 있습니다.',
   SIGNUP_CONFIRM_EMAIL: '인증 메일을 확인해 주세요.',
-  PASSWORD_UPDATE_FAILED: '비밀번호 설정 중 오류가 발생했습니다. 다시 시도해 주세요.',
-  // 서버가 안내 문구를 주지 않았을 때만 쓰는 대체 문구
-  SIGNUP_REQUEST_ACCEPTED: '승인되면 메일로 안내됩니다',
   UNKNOWN_ERROR: '알 수 없는 오류가 발생했습니다.',
 } as const;
 

@@ -1,13 +1,6 @@
-import { axiosInstance } from '../axiosInstance';
-import { API_ROUTES } from '../constants';
 import { MESSAGES } from '../messages';
 import { signupSupabase, supabase } from '../supabaseClient';
-import type {
-  SignInRequest,
-  SignupRequest,
-  SignupRequestResponse,
-  UpdatePasswordRequest,
-} from '../types/api';
+import type { SignInRequest, SignupRequest } from '../types/api';
 import { assertNoError } from './unwrap';
 
 export type CurrentUser = { id: string; isAnonymous: boolean };
@@ -31,12 +24,6 @@ export async function ensureSession(captchaToken: string): Promise<void> {
       }),
     );
   }
-}
-
-export async function hasInviteSession(): Promise<boolean> {
-  const { data, error } = await supabase.auth.getSession();
-  if (error) throw error;
-  return Boolean(data.session) && !data.session?.user.is_anonymous;
 }
 
 export async function signIn({ email, password, captchaToken }: SignInRequest): Promise<void> {
@@ -71,24 +58,6 @@ export async function signUp({
   return MESSAGES.SIGNUP_CONFIRM_EMAIL;
 }
 
-export async function updatePassword({ password }: UpdatePasswordRequest): Promise<void> {
-  let result: Awaited<ReturnType<typeof supabase.auth.updateUser>>;
-  try {
-    result = await supabase.auth.updateUser({ password });
-  } catch {
-    throw new Error(MESSAGES.PASSWORD_UPDATE_FAILED);
-  }
-  assertNoError(result);
-}
-
 export async function signOut(): Promise<void> {
   assertNoError(await supabase.auth.signOut());
-}
-
-/** 관리자 승인 대기열에 가입 요청을 넣는다. 성공 시 사용자에게 보여줄 안내 문구를 돌려준다. */
-export async function requestSignup({ email }: SignupRequest): Promise<string> {
-  const { data } = await axiosInstance.post<SignupRequestResponse>(API_ROUTES.SIGNUP_REQUEST, {
-    email,
-  });
-  return data.message ?? MESSAGES.SIGNUP_REQUEST_ACCEPTED;
 }

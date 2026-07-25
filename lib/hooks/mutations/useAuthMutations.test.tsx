@@ -4,11 +4,9 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../api', () => ({
-  requestSignup: vi.fn(),
   signIn: vi.fn(),
   signOut: vi.fn(),
   signUp: vi.fn(),
-  updatePassword: vi.fn(),
 }));
 
 import { signUp } from '../../api';
