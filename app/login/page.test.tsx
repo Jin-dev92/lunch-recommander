@@ -265,8 +265,7 @@ describe('회원가입 모달', () => {
     expect(await within(dialog).findByText('인증 메일을 다시 보냈습니다.')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: '60초 후 재전송' })).toBeDisabled();
     await waitFor(
-      () =>
-        expect(within(dialog).getByRole('button', { name: '59초 후 재전송' })).toBeDisabled(),
+      () => expect(within(dialog).getByRole('button', { name: '59초 후 재전송' })).toBeDisabled(),
       { timeout: 1_500 },
     );
   });
