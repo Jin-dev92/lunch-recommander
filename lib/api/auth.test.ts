@@ -11,18 +11,20 @@ vi.mock('../supabaseClient', () => ({
   },
   signupSupabase: {
     auth: {
+      resend: vi.fn(),
       signUp: vi.fn(),
     },
   },
 }));
 
 import { signupSupabase, supabase } from '../supabaseClient';
-import { ensureSession, signIn, signUp } from './auth';
+import { ensureSession, resendSignupEmail, signIn, signUp } from './auth';
 
 const getSession = supabase.auth.getSession as ReturnType<typeof vi.fn>;
 const signInAnonymously = supabase.auth.signInAnonymously as ReturnType<typeof vi.fn>;
 const signInWithPassword = supabase.auth.signInWithPassword as ReturnType<typeof vi.fn>;
 const signOut = supabase.auth.signOut as ReturnType<typeof vi.fn>;
+const signupClientResend = signupSupabase.auth.resend as ReturnType<typeof vi.fn>;
 const signupClientSignUp = signupSupabase.auth.signUp as ReturnType<typeof vi.fn>;
 
 describe('인증 API', () => {
@@ -31,6 +33,7 @@ describe('인증 API', () => {
     signInAnonymously.mockReset();
     signInWithPassword.mockReset();
     signOut.mockReset();
+    signupClientResend.mockReset();
     signupClientSignUp.mockReset();
   });
 
@@ -119,5 +122,41 @@ describe('인증 API', () => {
       }),
     ).rejects.toThrow('이미 로그인되어 있습니다.');
     expect(signupClientSignUp).not.toHaveBeenCalled();
+  });
+
+  it('가입 인증 메일을 CAPTCHA 토큰과 홈 redirect로 재전송합니다', async () => {
+    signupClientResend.mockResolvedValue({ data: {}, error: null });
+
+    await expect(
+      resendSignupEmail({
+        email: 'user@example.com',
+        captchaToken: 'captcha-token',
+        emailRedirectTo: 'https://example.com/',
+      }),
+    ).resolves.toBe('인증 메일을 다시 보냈습니다.');
+
+    expect(signupClientResend).toHaveBeenCalledWith({
+      type: 'signup',
+      email: 'user@example.com',
+      options: {
+        captchaToken: 'captcha-token',
+        emailRedirectTo: 'https://example.com/',
+      },
+    });
+  });
+
+  it('인증 메일 재전송 오류를 예외로 승격합니다', async () => {
+    signupClientResend.mockResolvedValue({
+      data: {},
+      error: { message: '잠시 후 다시 시도해 주세요.' },
+    });
+
+    await expect(
+      resendSignupEmail({
+        email: 'user@example.com',
+        captchaToken: 'captcha-token',
+        emailRedirectTo: 'https://example.com/',
+      }),
+    ).rejects.toMatchObject({ message: '잠시 후 다시 시도해 주세요.' });
   });
 });

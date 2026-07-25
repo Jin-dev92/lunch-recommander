@@ -12,3 +12,9 @@ export type SignupRequest = {
   captchaToken: string;
   emailRedirectTo: string;
 };
+
+export type ResendSignupEmailRequest = {
+  email: string;
+  captchaToken: string;
+  emailRedirectTo: string;
+};
