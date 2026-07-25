@@ -1,10 +1,10 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import AuthTurnstile, { type AuthTurnstileHandle } from '../../components/AuthTurnstile';
 import Spinner from '../../components/Spinner';
 import { ROUTES } from '../../lib/constants';
-import { useSignIn, useSignUp } from '../../lib/hooks/mutations';
+import { useResendSignupEmail, useSignIn, useSignUp } from '../../lib/hooks/mutations';
 import { errorMessage } from '../../lib/messages';
 import styles from './login.module.css';
 
@@ -19,18 +19,33 @@ type SignupFormValues = {
   passwordConfirm: string;
 };
 
+const RESEND_COOLDOWN_SECONDS = 60;
+
 export default function LoginPage() {
   const signInForm = useForm<SignInFormValues>();
   const signupForm = useForm<SignupFormValues>();
   const signIn = useSignIn();
   const signUp = useSignUp();
+  const resendSignupEmail = useResendSignupEmail();
   const [signInCaptchaToken, setSignInCaptchaToken] = useState('');
   const [signupCaptchaToken, setSignupCaptchaToken] = useState('');
+  const [resendCaptchaToken, setResendCaptchaToken] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [signupEmail, setSignupEmail] = useState('');
   const [signupOpen, setSignupOpen] = useState(false);
   const signInCaptcha = useRef<AuthTurnstileHandle>(null);
   const signupCaptcha = useRef<AuthTurnstileHandle>(null);
+  const resendCaptcha = useRef<AuthTurnstileHandle>(null);
   // 네이티브 <dialog>를 쓰면 백드롭·포커스 트랩·Esc 닫기를 브라우저가 처리한다.
   const dialog = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timeout = window.setTimeout(() => {
+      setResendCooldown((seconds) => Math.max(0, seconds - 1));
+    }, 1_000);
+    return () => window.clearTimeout(timeout);
+  }, [resendCooldown]);
 
   // 화면 이동은 UI 후처리이므로 mutation hook이 아니라 소비 컴포넌트가 맡는다.
   // 로그인 성공 시 supabase-js가 실사용자 세션을 세우므로, 홈으로 보내면 로그인 상태로 뜬다.
@@ -55,17 +70,41 @@ export default function LoginPage() {
         emailRedirectTo: `${location.origin}${ROUTES.HOME}`,
       },
       {
+        onSuccess: () => setSignupEmail(values.email),
         onSettled: () => signupCaptcha.current?.reset(),
       },
     );
   });
 
+  function resendEmail() {
+    if (!resendCaptchaToken || !signupEmail) return;
+    resendSignupEmail.mutate(
+      {
+        email: signupEmail,
+        captchaToken: resendCaptchaToken,
+        emailRedirectTo: `${location.origin}${ROUTES.HOME}`,
+      },
+      {
+        onSuccess: () => setResendCooldown(RESEND_COOLDOWN_SECONDS),
+        onSettled: () => {
+          setResendCaptchaToken('');
+          resendCaptcha.current?.reset();
+        },
+      },
+    );
+  }
+
   // 다시 열었을 때 이전 결과가 남아 있지 않도록 입력과 요청 상태를 함께 비운다.
   function openSignup() {
     signupForm.reset();
     signUp.reset();
+    resendSignupEmail.reset();
     setSignupCaptchaToken('');
+    setResendCaptchaToken('');
+    setResendCooldown(0);
+    setSignupEmail('');
     signupCaptcha.current?.reset();
+    resendCaptcha.current?.reset();
     setSignupOpen(true);
     dialog.current?.showModal();
   }
@@ -143,85 +182,128 @@ export default function LoginPage() {
         <h2 className={styles.dialogTitle} id="signup-title">
           회원가입
         </h2>
-        <p className={styles.dialogDescription}>
-          이메일과 비밀번호를 입력한 뒤 전송된 인증 링크를 확인해 주세요.
-        </p>
-        <form className={styles.form} onSubmit={submitSignup}>
-          <label className={styles.field} htmlFor="signup-email">
-            회원가입 이메일
-            <input
-              className={styles.input}
-              id="signup-email"
-              type="email"
-              autoComplete="email"
-              required
-              {...signupForm.register('email', { required: true })}
-            />
-          </label>
-          <label className={styles.field} htmlFor="signup-password">
-            회원가입 비밀번호
-            <input
-              className={styles.input}
-              id="signup-password"
-              type="password"
-              autoComplete="new-password"
-              minLength={8}
-              required
-              {...signupForm.register('password', { required: true, minLength: 8 })}
-            />
-          </label>
-          <label className={styles.field} htmlFor="signup-password-confirm">
-            비밀번호 확인
-            <input
-              className={styles.input}
-              id="signup-password-confirm"
-              type="password"
-              autoComplete="new-password"
-              minLength={8}
-              required
-              {...signupForm.register('passwordConfirm', {
-                required: true,
-                validate: (value) =>
-                  value === signupForm.getValues('password') || '비밀번호가 일치하지 않습니다.',
-              })}
-            />
-          </label>
-          {signupForm.formState.errors.passwordConfirm?.message && (
-            <p className={styles.error} role="alert">
-              {signupForm.formState.errors.passwordConfirm.message}
-            </p>
-          )}
-          {signupOpen && (
-            <div className={styles.captcha}>
-              <AuthTurnstile ref={signupCaptcha} onTokenChange={setSignupCaptchaToken} />
-            </div>
-          )}
-          <button
-            className={styles.button}
-            type="submit"
-            disabled={signUp.isPending || !signupCaptchaToken}
-            aria-busy={signUp.isPending}
-          >
-            {signUp.isPending ? (
-              <>
-                <Spinner />
-                가입 중…
-              </>
-            ) : (
-              '가입하기'
-            )}
-          </button>
-          {signUp.isSuccess && (
+        {signupEmail ? (
+          <div className={styles.form}>
             <p className={styles.notice} role="status">
               {signUp.data}
             </p>
-          )}
-          {signUp.isError && (
-            <p className={styles.error} role="alert">
-              {errorMessage(signUp.error)}
+            <p className={styles.confirmationEmail}>{signupEmail}</p>
+            <p className={styles.resendHelp}>
+              메일함과 스팸함에서 인증 링크를 확인해 주세요.
             </p>
-          )}
-        </form>
+            <div className={styles.captcha}>
+              <AuthTurnstile ref={resendCaptcha} onTokenChange={setResendCaptchaToken} />
+            </div>
+            <button
+              className={styles.button}
+              type="button"
+              disabled={
+                resendSignupEmail.isPending || resendCooldown > 0 || !resendCaptchaToken
+              }
+              aria-busy={resendSignupEmail.isPending}
+              onClick={resendEmail}
+            >
+              {resendSignupEmail.isPending ? (
+                <>
+                  <Spinner />
+                  재전송 중…
+                </>
+              ) : resendCooldown > 0 ? (
+                `${resendCooldown}초 후 재전송`
+              ) : (
+                '인증 메일 재전송'
+              )}
+            </button>
+            {resendSignupEmail.isSuccess && (
+              <p className={styles.notice} role="status">
+                {resendSignupEmail.data}
+              </p>
+            )}
+            {resendSignupEmail.isError && (
+              <p className={styles.error} role="alert">
+                {errorMessage(resendSignupEmail.error)}
+              </p>
+            )}
+          </div>
+        ) : (
+          <>
+            <p className={styles.dialogDescription}>
+              이메일과 비밀번호를 입력한 뒤 전송된 인증 링크를 확인해 주세요.
+            </p>
+            <form className={styles.form} onSubmit={submitSignup}>
+              <label className={styles.field} htmlFor="signup-email">
+                회원가입 이메일
+                <input
+                  className={styles.input}
+                  id="signup-email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  {...signupForm.register('email', { required: true })}
+                />
+              </label>
+              <label className={styles.field} htmlFor="signup-password">
+                회원가입 비밀번호
+                <input
+                  className={styles.input}
+                  id="signup-password"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  {...signupForm.register('password', { required: true, minLength: 8 })}
+                />
+              </label>
+              <label className={styles.field} htmlFor="signup-password-confirm">
+                비밀번호 확인
+                <input
+                  className={styles.input}
+                  id="signup-password-confirm"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  {...signupForm.register('passwordConfirm', {
+                    required: true,
+                    validate: (value) =>
+                      value === signupForm.getValues('password') ||
+                      '비밀번호가 일치하지 않습니다.',
+                  })}
+                />
+              </label>
+              {signupForm.formState.errors.passwordConfirm?.message && (
+                <p className={styles.error} role="alert">
+                  {signupForm.formState.errors.passwordConfirm.message}
+                </p>
+              )}
+              {signupOpen && (
+                <div className={styles.captcha}>
+                  <AuthTurnstile ref={signupCaptcha} onTokenChange={setSignupCaptchaToken} />
+                </div>
+              )}
+              <button
+                className={styles.button}
+                type="submit"
+                disabled={signUp.isPending || !signupCaptchaToken}
+                aria-busy={signUp.isPending}
+              >
+                {signUp.isPending ? (
+                  <>
+                    <Spinner />
+                    가입 중…
+                  </>
+                ) : (
+                  '가입하기'
+                )}
+              </button>
+              {signUp.isError && (
+                <p className={styles.error} role="alert">
+                  {errorMessage(signUp.error)}
+                </p>
+              )}
+            </form>
+          </>
+        )}
         <button className={styles.secondaryButton} type="button" onClick={closeSignup}>
           닫기
         </button>

@@ -22,6 +22,7 @@ vi.mock('../../lib/supabaseClient', () => ({
   },
   signupSupabase: {
     auth: {
+      resend: vi.fn(),
       signUp: vi.fn(),
     },
   },
@@ -33,6 +34,7 @@ import LoginPage from './page';
 
 const getSession = supabase.auth.getSession as ReturnType<typeof vi.fn>;
 const signInWithPassword = supabase.auth.signInWithPassword as ReturnType<typeof vi.fn>;
+const resend = signupSupabase.auth.resend as ReturnType<typeof vi.fn>;
 const signUp = signupSupabase.auth.signUp as ReturnType<typeof vi.fn>;
 
 function loginForm() {
@@ -71,6 +73,7 @@ describe('로그인', () => {
   beforeEach(() => {
     getSession.mockReset();
     signInWithPassword.mockReset();
+    resend.mockReset();
     signUp.mockReset();
     captchaReset.mockReset();
     assign = vi.fn();
@@ -150,6 +153,7 @@ describe('회원가입 모달', () => {
       error: null,
     });
     signInWithPassword.mockReset();
+    resend.mockReset();
     signUp.mockReset();
     captchaReset.mockReset();
   });
@@ -195,7 +199,98 @@ describe('회원가입 모달', () => {
         emailRedirectTo: `${window.location.origin}/`,
       },
     });
+    expect(within(dialog).queryByLabelText('회원가입 비밀번호')).not.toBeInTheDocument();
+    expect(within(dialog).getByText('guest@example.com')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: '인증 메일 재전송' })).toBeDisabled();
     expect(captchaReset).toHaveBeenCalled();
+  });
+
+  it('가입한 이메일로 CAPTCHA 토큰과 홈 redirect를 사용해 인증 메일을 재전송합니다', async () => {
+    signUp.mockResolvedValue({ data: { user: {}, session: null }, error: null });
+    resend.mockResolvedValue({ data: {}, error: null });
+    renderWithQuery(<LoginPage />);
+    const dialog = openSignup();
+    fillSignup();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.submit(within(dialog).getByRole('button', { name: '가입하기' }).closest('form')!);
+    await within(dialog).findByText('guest@example.com');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '인증 메일 재전송' }));
+
+    await waitFor(() =>
+      expect(resend).toHaveBeenCalledWith({
+        type: 'signup',
+        email: 'guest@example.com',
+        options: {
+          captchaToken: 'captcha-token',
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      }),
+    );
+  });
+
+  it('재전송 요청 중 공통 스피너를 보여줍니다', async () => {
+    signUp.mockResolvedValue({ data: { user: {}, session: null }, error: null });
+    resend.mockReturnValue(new Promise(() => {}));
+    renderWithQuery(<LoginPage />);
+    const dialog = openSignup();
+    fillSignup();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.submit(within(dialog).getByRole('button', { name: '가입하기' }).closest('form')!);
+    await within(dialog).findByText('guest@example.com');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '인증 메일 재전송' }));
+
+    const button = await within(dialog).findByRole('button', { name: '재전송 중…' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(within(button).getByTestId('spinner')).toBeInTheDocument();
+  });
+
+  it('재전송 성공 후 60초 쿨다운을 표시하고 남은 시간을 줄입니다', async () => {
+    signUp.mockResolvedValue({ data: { user: {}, session: null }, error: null });
+    resend.mockResolvedValue({ data: {}, error: null });
+    renderWithQuery(<LoginPage />);
+    const dialog = openSignup();
+    fillSignup();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.submit(within(dialog).getByRole('button', { name: '가입하기' }).closest('form')!);
+    await within(dialog).findByText('guest@example.com');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '인증 메일 재전송' }));
+
+    expect(await within(dialog).findByText('인증 메일을 다시 보냈습니다.')).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: '60초 후 재전송' })).toBeDisabled();
+    await waitFor(
+      () =>
+        expect(within(dialog).getByRole('button', { name: '59초 후 재전송' })).toBeDisabled(),
+      { timeout: 1_500 },
+    );
+  });
+
+  it('재전송 실패를 표시하고 CAPTCHA를 초기화합니다', async () => {
+    signUp.mockResolvedValue({ data: { user: {}, session: null }, error: null });
+    resend.mockResolvedValue({
+      data: {},
+      error: { message: '재전송 실패' },
+    });
+    renderWithQuery(<LoginPage />);
+    const dialog = openSignup();
+    fillSignup();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.submit(within(dialog).getByRole('button', { name: '가입하기' }).closest('form')!);
+    await within(dialog).findByText('guest@example.com');
+    const resetCountAfterSignup = captchaReset.mock.calls.length;
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '인증 메일 재전송' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('재전송 실패');
+    expect(captchaReset).toHaveBeenCalledTimes(resetCountAfterSignup + 1);
+    expect(within(dialog).getByRole('button', { name: '인증 메일 재전송' })).toBeDisabled();
   });
 
   it('가입 오류를 표시하고 위젯을 초기화합니다', async () => {
@@ -239,6 +334,7 @@ describe('회원가입 모달', () => {
     dialog = openSignup();
 
     expect(within(dialog).queryByRole('status')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('guest@example.com')).not.toBeInTheDocument();
     expect(within(dialog).getByLabelText('회원가입 이메일')).toHaveValue('');
     expect(within(dialog).getByRole('button', { name: '가입하기' })).toBeDisabled();
   });
