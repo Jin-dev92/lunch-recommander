@@ -1,162 +1,245 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { forwardRef, useImperativeHandle } from 'react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const captchaReset = vi.fn();
+
+vi.mock('../../components/AuthTurnstile', () => ({
+  default: forwardRef<{ reset(): void }, { onTokenChange(token: string): void }>(
+    function AuthTurnstileDouble({ onTokenChange }, ref) {
+      useImperativeHandle(ref, () => ({ reset: captchaReset }));
+      return <button onClick={() => onTokenChange('captcha-token')}>CAPTCHA 확인</button>;
+    },
+  ),
+}));
+
 vi.mock('../../lib/supabaseClient', () => ({
   supabase: {
-    auth: { signInWithPassword: vi.fn() },
+    auth: {
+      getSession: vi.fn(),
+      signInWithPassword: vi.fn(),
+    },
+  },
+  signupSupabase: {
+    auth: {
+      signUp: vi.fn(),
+    },
   },
 }));
-vi.mock('../../lib/axiosInstance', () => ({
-  axiosInstance: { post: vi.fn() },
-}));
-import { axiosInstance } from '../../lib/axiosInstance';
-import { supabase } from '../../lib/supabaseClient';
+
+import { signupSupabase, supabase } from '../../lib/supabaseClient';
 import { renderWithQuery } from '../../tests/renderWithQuery';
 import LoginPage from './page';
 
+const getSession = supabase.auth.getSession as ReturnType<typeof vi.fn>;
 const signInWithPassword = supabase.auth.signInWithPassword as ReturnType<typeof vi.fn>;
-const post = axiosInstance.post as ReturnType<typeof vi.fn>;
+const signUp = signupSupabase.auth.signUp as ReturnType<typeof vi.fn>;
 
-function fillAndSubmit() {
+function loginForm() {
+  return screen.getByLabelText('이메일').closest('form')!;
+}
+
+function fillLogin() {
   fireEvent.change(screen.getByLabelText('이메일'), {
     target: { value: 'a@b.com' },
   });
   fireEvent.change(screen.getByLabelText('비밀번호'), {
     target: { value: 'password1' },
   });
-  fireEvent.submit(screen.getByRole('button', { name: '로그인' }).closest('form')!);
+}
+
+function openSignup() {
+  fireEvent.click(screen.getByRole('button', { name: '회원가입' }));
+  return screen.getByRole('dialog');
+}
+
+function fillSignup(passwordConfirm = 'password1') {
+  fireEvent.change(screen.getByLabelText('회원가입 이메일'), {
+    target: { value: 'guest@example.com' },
+  });
+  fireEvent.change(screen.getByLabelText('회원가입 비밀번호'), {
+    target: { value: 'password1' },
+  });
+  fireEvent.change(screen.getByLabelText('비밀번호 확인'), {
+    target: { value: passwordConfirm },
+  });
 }
 
 describe('로그인', () => {
   let assign: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
+    getSession.mockReset();
     signInWithPassword.mockReset();
-    post.mockReset();
-    document.cookie = 'sb-session=; path=/; max-age=0';
+    signUp.mockReset();
+    captchaReset.mockReset();
     assign = vi.fn();
-    // ponytail: jsdom의 window.location.assign은 non-configurable이라 vi.spyOn으로 못 덮어씀 → location 객체 자체를 교체
     Object.defineProperty(window, 'location', {
       writable: true,
       value: { ...window.location, assign },
     });
   });
 
-  it('이메일과 비밀번호 입력을 표시합니다', () => {
+  it('CAPTCHA 검증 전에는 로그인을 제출할 수 없습니다', () => {
     renderWithQuery(<LoginPage />);
-    expect(screen.getByLabelText('이메일')).toBeInTheDocument();
-    expect(screen.getByLabelText('비밀번호')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '로그인' })).toBeInTheDocument();
+    fillLogin();
+
+    expect(screen.getByRole('button', { name: '로그인' })).toBeDisabled();
+    expect(signInWithPassword).not.toHaveBeenCalled();
   });
 
-  it('로그인 성공 시 홈으로 이동합니다', async () => {
-    signInWithPassword.mockResolvedValue({ error: null });
+  it('CAPTCHA 토큰으로 로그인하고 완료 후 위젯을 초기화합니다', async () => {
+    signInWithPassword.mockResolvedValue({
+      data: { user: { id: 'user-id' }, session: { access_token: 'token' } },
+      error: null,
+    });
     renderWithQuery(<LoginPage />);
-    fillAndSubmit();
+    fillLogin();
+    fireEvent.click(within(loginForm()).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.submit(loginForm());
+
     await waitFor(() => expect(assign).toHaveBeenCalledWith('/'));
     expect(signInWithPassword).toHaveBeenCalledWith({
       email: 'a@b.com',
       password: 'password1',
+      options: { captchaToken: 'captcha-token' },
     });
+    expect(captchaReset).toHaveBeenCalled();
   });
 
-  it('로그인 실패 시 에러 메시지를 보여주고 이동하지 않습니다', async () => {
+  it('로그인 실패 시 오류를 표시하고 위젯을 초기화합니다', async () => {
     signInWithPassword.mockResolvedValue({
+      data: { user: null, session: null },
       error: { message: '잘못된 비밀번호입니다' },
     });
     renderWithQuery(<LoginPage />);
-    fillAndSubmit();
-    await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent('잘못된 비밀번호입니다'),
-    );
+    fillLogin();
+    fireEvent.click(within(loginForm()).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.submit(loginForm());
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('잘못된 비밀번호입니다');
     expect(assign).not.toHaveBeenCalled();
+    expect(captchaReset).toHaveBeenCalled();
   });
 
   it('로그인 요청 중 공통 스피너를 보여줍니다', async () => {
     signInWithPassword.mockReturnValue(new Promise(() => {}));
     renderWithQuery(<LoginPage />);
-    fillAndSubmit();
+    fillLogin();
+    fireEvent.click(within(loginForm()).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.submit(loginForm());
 
     const button = await screen.findByRole('button', { name: '로그인 중…' });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('aria-busy', 'true');
-    expect(screen.getByTestId('spinner')).toBeInTheDocument();
+    expect(within(button).getByTestId('spinner')).toBeInTheDocument();
   });
 
-  it('회원가입 요청 폼은 모달을 열기 전에는 보이지 않습니다', () => {
+  it('회원가입 폼은 모달을 열기 전에는 보이지 않습니다', () => {
     renderWithQuery(<LoginPage />);
+
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '회원가입 요청' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '회원가입' })).toBeInTheDocument();
   });
 });
 
-describe('회원가입 요청 모달', () => {
+describe('회원가입 모달', () => {
   beforeEach(() => {
-    signInWithPassword.mockReset();
-    post.mockReset();
-  });
-
-  function openModal() {
-    renderWithQuery(<LoginPage />);
-    fireEvent.click(screen.getByRole('button', { name: '회원가입 요청' }));
-  }
-
-  function submitRequest(email = 'guest@example.com') {
-    fireEvent.change(screen.getByLabelText('회원가입 요청 이메일'), { target: { value: email } });
-    fireEvent.submit(screen.getByRole('button', { name: '요청 보내기' }).closest('form')!);
-  }
-
-  it('회원가입 요청 버튼을 누르면 모달이 열립니다', () => {
-    openModal();
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByLabelText('회원가입 요청 이메일')).toBeInTheDocument();
-  });
-
-  it('닫기를 누르면 모달이 닫힙니다', () => {
-    openModal();
-    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  });
-
-  it('요청 성공 안내를 표시합니다', async () => {
-    post.mockResolvedValue({ data: { message: '승인되면 메일로 안내됩니다' } });
-    openModal();
-    submitRequest();
-    await waitFor(() =>
-      expect(screen.getByRole('status')).toHaveTextContent('승인되면 메일로 안내됩니다'),
-    );
-    expect(post).toHaveBeenCalledWith('/signup-request', {
-      email: 'guest@example.com',
+    getSession.mockReset().mockResolvedValue({
+      data: { session: { user: { is_anonymous: true } } },
+      error: null,
     });
+    signInWithPassword.mockReset();
+    signUp.mockReset();
+    captchaReset.mockReset();
   });
 
-  it('요청 오류를 alert로 표시합니다', async () => {
-    post.mockRejectedValue(new Error('요청 한도를 초과했습니다.'));
-    openModal();
-    submitRequest();
-    await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent('요청 한도를 초과했습니다.'),
+  it('이메일과 두 비밀번호 입력을 표시합니다', () => {
+    renderWithQuery(<LoginPage />);
+    const dialog = openSignup();
+
+    expect(within(dialog).getByLabelText('회원가입 이메일')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('회원가입 비밀번호')).toHaveAttribute('minlength', '8');
+    expect(within(dialog).getByLabelText('비밀번호 확인')).toBeInTheDocument();
+  });
+
+  it('비밀번호가 다르면 가입 요청을 보내지 않습니다', async () => {
+    renderWithQuery(<LoginPage />);
+    const dialog = openSignup();
+    fillSignup('different1');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.submit(within(dialog).getByRole('button', { name: '가입하기' }).closest('form')!);
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      '비밀번호가 일치하지 않습니다.',
     );
+    expect(signUp).not.toHaveBeenCalled();
   });
 
-  it('회원가입 요청 중 공통 스피너를 보여줍니다', async () => {
-    post.mockReturnValue(new Promise(() => {}));
-    openModal();
-    submitRequest();
+  it('CAPTCHA 토큰으로 가입하고 인증 메일 안내를 표시합니다', async () => {
+    signUp.mockResolvedValue({ data: { user: {}, session: null }, error: null });
+    renderWithQuery(<LoginPage />);
+    const dialog = openSignup();
+    fillSignup();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.submit(within(dialog).getByRole('button', { name: '가입하기' }).closest('form')!);
 
-    const button = await screen.findByRole('button', { name: '요청 중…' });
+    expect(await within(dialog).findByRole('status')).toHaveTextContent(
+      '인증 메일을 확인해 주세요.',
+    );
+    expect(signUp).toHaveBeenCalledWith({
+      email: 'guest@example.com',
+      password: 'password1',
+      options: {
+        captchaToken: 'captcha-token',
+        emailRedirectTo: `${window.location.origin}/`,
+      },
+    });
+    expect(captchaReset).toHaveBeenCalled();
+  });
+
+  it('가입 오류를 표시하고 위젯을 초기화합니다', async () => {
+    signUp.mockResolvedValue({
+      data: { user: null, session: null },
+      error: { message: '가입할 수 없습니다.' },
+    });
+    renderWithQuery(<LoginPage />);
+    const dialog = openSignup();
+    fillSignup();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.submit(within(dialog).getByRole('button', { name: '가입하기' }).closest('form')!);
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('가입할 수 없습니다.');
+    expect(captchaReset).toHaveBeenCalled();
+  });
+
+  it('가입 요청 중 공통 스피너를 보여줍니다', async () => {
+    signUp.mockReturnValue(new Promise(() => {}));
+    renderWithQuery(<LoginPage />);
+    const dialog = openSignup();
+    fillSignup();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.submit(within(dialog).getByRole('button', { name: '가입하기' }).closest('form')!);
+
+    const button = await within(dialog).findByRole('button', { name: '가입 중…' });
     expect(button).toBeDisabled();
-    expect(screen.getByTestId('spinner')).toBeInTheDocument();
+    expect(within(button).getByTestId('spinner')).toBeInTheDocument();
   });
 
-  it('닫았다가 다시 열면 이전 결과가 남지 않습니다', async () => {
-    post.mockResolvedValue({ data: { message: '승인되면 메일로 안내됩니다' } });
-    openModal();
-    submitRequest();
-    await screen.findByRole('status');
+  it('닫았다가 다시 열면 이전 결과와 입력을 초기화합니다', async () => {
+    signUp.mockResolvedValue({ data: { user: {}, session: null }, error: null });
+    renderWithQuery(<LoginPage />);
+    let dialog = openSignup();
+    fillSignup();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'CAPTCHA 확인' }));
+    fireEvent.submit(within(dialog).getByRole('button', { name: '가입하기' }).closest('form')!);
+    await within(dialog).findByRole('status');
 
-    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
-    fireEvent.click(screen.getByRole('button', { name: '회원가입 요청' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '닫기' }));
+    dialog = openSignup();
 
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('회원가입 요청 이메일')).toHaveValue('');
+    expect(within(dialog).queryByRole('status')).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText('회원가입 이메일')).toHaveValue('');
+    expect(within(dialog).getByRole('button', { name: '가입하기' })).toBeDisabled();
   });
 });

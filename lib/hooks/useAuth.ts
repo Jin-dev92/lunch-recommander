@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { ensureSession, getCurrentUser, type CurrentUser } from '../api';
+import { getCurrentUser, type CurrentUser } from '../api';
 import { supabase } from '../supabaseClient';
 
 type AuthState = {
@@ -11,8 +11,8 @@ type AuthState = {
 };
 
 /**
- * 방문 시 세션을 보장하고(없으면 익명 세션 발급) 로그인 여부를 반영한다.
- * 로그인은 optional이라, 익명 세션은 "로그인 안 함"으로 취급한다.
+ * 현재 사용자와 이후 세션 변화를 반영한다. 익명 세션 발급은 CAPTCHA 토큰을 가진
+ * AnonymousSessionGate가 담당하고, 익명 사용자는 "로그인 안 함"으로 취급한다.
  */
 export function useAuth(): AuthState {
   const [user, setUser] = useState<CurrentUser | null>(null);
@@ -20,13 +20,11 @@ export function useAuth(): AuthState {
 
   useEffect(() => {
     let active = true;
-    ensureSession()
-      .then(getCurrentUser)
-      .then((current) => {
-        if (!active) return;
-        setUser(current);
-        setReady(true);
-      });
+    getCurrentUser().then((current) => {
+      if (!active) return;
+      setUser(current);
+      setReady(true);
+    });
 
     // 로그인·로그아웃 시 헤더와 평가 UI가 즉시 갱신되도록 세션 변화를 구독한다.
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {

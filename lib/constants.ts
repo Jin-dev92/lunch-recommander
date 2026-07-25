@@ -9,7 +9,6 @@ export const ROUTES = {
 export const API_ROUTES = {
   NEARBY: '/nearby',
   PLACE_PHOTO: '/place-photo',
-  SIGNUP_REQUEST: '/signup-request',
 } as const;
 
 // Google priceLevel 열거형을 ₩ 기호로 환산한다. Google은 실제 메뉴 가격이 아니라

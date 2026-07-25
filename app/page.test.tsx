@@ -6,7 +6,6 @@ vi.mock('../lib/supabaseClient', () => ({
       signOut: vi.fn(),
       getSession: vi.fn(),
       getUser: vi.fn(),
-      signInAnonymously: vi.fn(),
       onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
     },
     rpc: vi.fn(),
@@ -21,7 +20,6 @@ import HomePage from './page';
 const signOut = supabase.auth.signOut as ReturnType<typeof vi.fn>;
 const getSession = supabase.auth.getSession as ReturnType<typeof vi.fn>;
 const getUser = supabase.auth.getUser as ReturnType<typeof vi.fn>;
-const signInAnonymously = supabase.auth.signInAnonymously as ReturnType<typeof vi.fn>;
 
 function mockUser(isAnonymous: boolean) {
   getSession.mockResolvedValue({
@@ -35,7 +33,6 @@ describe('홈 헤더', () => {
     signOut.mockReset();
     getSession.mockReset();
     getUser.mockReset();
-    signInAnonymously.mockReset().mockResolvedValue({ data: {}, error: null });
   });
 
   it('로그인한 사용자에게는 로그아웃 버튼을 보여줍니다', async () => {
@@ -50,13 +47,6 @@ describe('홈 헤더', () => {
     renderWithQuery(<HomePage />);
     expect(await screen.findByRole('link', { name: '로그인' })).toHaveAttribute('href', '/login');
     expect(screen.queryByRole('button', { name: '로그아웃' })).not.toBeInTheDocument();
-  });
-
-  it('세션이 없으면 익명 세션을 발급합니다', async () => {
-    getSession.mockResolvedValue({ data: { session: null } });
-    getUser.mockResolvedValue({ data: { user: { id: 'anon', is_anonymous: true } } });
-    renderWithQuery(<HomePage />);
-    await waitFor(() => expect(signInAnonymously).toHaveBeenCalled());
   });
 
   it('로그아웃하면 세션을 정리하고 오류 없이 진행합니다', async () => {

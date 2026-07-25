@@ -20,7 +20,7 @@
 - 외부 서비스:
   - 구글 Places API: 주변 음식점과 평점·가격대·사진 정보를 조회합니다.
   - 구글 Maps JavaScript API: 브라우저에서 지도를 렌더링합니다.
-  - Discord 웹훅: 관리자에게 회원가입 승인 알림을 보냅니다.
+  - Cloudflare Turnstile: 익명 세션 생성, 로그인, 회원가입의 자동화된 요청을 차단합니다.
 
 ## 주요 기능
 
@@ -48,16 +48,18 @@
 
 - 초대코드를 기반으로 그룹을 만들고 지인을 연결합니다.
 
-### 회원가입(관리자 승인제)
+### 회원가입(이메일 인증)
 
-- 아무나 가입하지 못하도록 관리자 승인 기반 회원가입을 사용합니다. 방문자가 이메일로 가입을 요청하면 관리자에게 Discord 알림이 가고, 관리자가 승인하면 방문자에게 비밀번호 설정 링크가 전달됩니다.
-- 관리자 알림은 이메일이 아니라 Discord 웹훅을 씁니다. Resend 같은 이메일 발송 서비스는 발신 도메인 인증을 요구하는데, 커스텀 도메인 없이 배포하는 환경에서는 인증을 완료할 수 없기 때문입니다.
+- 이메일과 비밀번호를 입력하면 Supabase Auth가 인증 메일을 보냅니다. 사용자가 인증 링크를 누르면 홈으로 이동하며 로그인 세션이 생성됩니다.
+- 익명 세션, 로그인, 회원가입은 모두 Cloudflare Turnstile 토큰을 Supabase Auth에 전달해 서버에서 검증합니다.
+- 회원가입은 세션을 저장하지 않는 별도 Supabase 클라이언트에서 요청하므로, 인증 메일을 기다리는 동안 기존 익명 세션으로 추천을 계속 사용할 수 있습니다.
 
 ### 보안·요금 방어
 
-- 서버에서 사용자 ID와 IP를 함께 기준으로 요청 횟수를 제한합니다. 프론트엔드만으로 제한하지 않아 스팸 요청으로 인한 Supabase 및 구글 API 과금을 방어합니다.
+- 유료 Places 호출은 Edge Function에서 사용자 ID와 IP를 함께 기준으로 제한합니다. 가입 전 Auth 요청은 Supabase Auth의 IP 기반 rate limit과 Turnstile을 함께 적용합니다. 프론트엔드만으로 제한하지 않아 스팸 요청으로 인한 Supabase 및 구글 API 과금을 방어합니다.
 - 구글 Places API 호출은 Edge Function을 통해 처리하여 서버용 API 키가 브라우저에 노출되지 않도록 합니다.
 - 구글 Places 호출 결과는 15분 동안 캐시하여 동일 위치의 반복 호출을 줄입니다.
+- 익명 사용자도 PostgreSQL의 `authenticated` 역할을 사용하지만, `0007_block_anonymous_writes.sql`의 restrictive RLS 정책이 평점·기호·그룹 쓰기를 차단합니다.
 
 ## 아키텍처 메모
 
@@ -85,10 +87,6 @@ flowchart TD
 
 - `nearby`: 주변 음식점을 조회합니다. 캐시가 없으면 구글 Places를 호출하고 결과를 캐시합니다.
 - `place-photo`: 추천된 음식점의 대표 사진 URL을 조회합니다. 서버용 키를 노출하지 않기 위해 이미지 URL 해석을 서버에서 처리합니다.
-- `signup-request`: 가입 요청을 접수하고 관리자에게 Discord 알림을 보냅니다.
-- `approve-signup`: 관리자가 가입 요청을 승인하거나 거절하고, 승인 시 사용자를 초대합니다.
-
-`signup-request`와 `approve-signup`은 로그인하지 않은 사용자가 호출하므로 게이트웨이의 JWT 검증(`verify_jwt`)을 끕니다. 대신 각자 사용량 제한과 승인 토큰 검사로 요청을 검증합니다. 이 설정은 `supabase/config.toml`에 선언되어 있습니다.
 
 ## 배포 상태
 
@@ -113,7 +111,17 @@ flowchart TD
 npm install
 ```
 
-### 3. 로컬 Supabase 기동
+### 3. Cloudflare Turnstile 준비
+
+Cloudflare Turnstile 사이트를 만들고 `localhost`, `127.0.0.1`, 실제 배포 도메인을 허용합니다. 발급된 site key는 다음 단계의 브라우저 환경변수에, secret key는 Supabase Auth에만 설정합니다.
+
+로컬 Supabase를 실행하는 셸에는 secret을 설정합니다. 이 값은 `.env.local`이나 `NEXT_PUBLIC_` 환경변수에 넣지 않습니다.
+
+```bash
+export SUPABASE_AUTH_CAPTCHA_SECRET=<Cloudflare Turnstile secret key>
+```
+
+### 4. 로컬 Supabase 기동
 
 ```bash
 npx supabase start
@@ -121,40 +129,50 @@ npx supabase start
 
 명령 출력에 표시된 API URL과 anon 키를 다음 단계의 환경변수에 사용합니다.
 
-### 4. 환경변수 설정
+### 5. 환경변수 설정
 
-프로젝트 루트에 `.env.local`을 만들고 `.env.local.example`을 참고하여 다음 값을 채웁니다. 세 값 모두 브라우저에 노출되는 `NEXT_PUBLIC_` 접두사를 사용합니다.
+프로젝트 루트에 `.env.local`을 만들고 `.env.local.example`을 참고하여 다음 값을 채웁니다. 네 값 모두 브라우저에 노출되는 공개 값입니다.
 
 ```dotenv
 NEXT_PUBLIC_SUPABASE_URL=<Supabase API URL>
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<Supabase anon key>
 NEXT_PUBLIC_GOOGLE_MAPS_KEY=<Google Maps JavaScript API key>
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=<Cloudflare Turnstile site key>
 ```
 
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`는 브라우저 노출이 허용되는 키이며, 데이터 접근은 RLS 정책으로 보호합니다.
 - `NEXT_PUBLIC_GOOGLE_MAPS_KEY`는 지도 렌더링용 키입니다. 허용된 도메인에서만 사용할 수 있도록 HTTP referrer 제한을 설정해야 합니다.
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY`는 위젯 렌더링용 공개 키입니다. Turnstile secret과 혼동하면 안 됩니다.
 
-민감한 키는 브라우저에 노출하지 않고 Edge Function 시크릿으로만 설정합니다.
+민감한 키는 브라우저에 노출하지 않고 Supabase Dashboard나 Edge Function 시크릿처럼 서버 측 설정으로만 보관합니다.
 
 - `GOOGLE_PLACES_API_KEY`: 서버용 Places 키. `VITE_`, `NEXT_PUBLIC_`처럼 클라이언트에 노출되는 접두사를 사용해서는 안 됩니다.
-- `SITE_URL`: 승인 링크와 초대 redirect 주소를 만드는 데 사용하는 배포 도메인입니다.
-- `DISCORD_WEBHOOK_URL`: 관리자 알림을 보낼 Discord 채널의 웹훅 주소입니다. 웹훅 URL 자체가 게시 권한이므로 비밀 값으로 취급합니다.
 
 로컬에서 Edge Function 시크릿을 설정하려면 다음처럼 실행합니다.
 
 ```bash
-npx supabase secrets set GOOGLE_PLACES_API_KEY=<...> SITE_URL=<...> DISCORD_WEBHOOK_URL=<...>
+npx supabase secrets set GOOGLE_PLACES_API_KEY=<...>
 ```
 
 AWS 또는 GCP 등 과금 가능한 클라우드 서비스를 사용할 때는 코드 외부에서 예산 알림(Budget Alert)과 할당량 상한을 설정해야 합니다.
 
-### 5. 개발 서버 실행
+### 6. Supabase Auth 운영 설정
+
+Supabase Dashboard에서 다음을 설정합니다.
+
+- Authentication > Email에서 이메일 가입과 이메일 확인을 활성화합니다.
+- Authentication > URL Configuration의 Site URL을 실제 배포 주소로 설정하고, Redirect URL에 실제 배포 주소와 필요한 Vercel Preview 주소를 정확히 등록합니다.
+- Authentication > Bot and Abuse Protection에서 Cloudflare Turnstile을 선택하고 secret key를 저장합니다.
+- Auth의 로그인·가입·익명 사용자 IP rate limit과 인증 메일 발송 한도를 서비스 규모에 맞게 확인합니다.
+- 실제 주소로 가입한 뒤 인증 링크를 열어 홈에서 비익명 로그인 상태가 되는지 smoke test합니다.
+
+### 7. 개발 서버 실행
 
 ```bash
 npm run dev
 ```
 
-### 6. 테스트
+### 8. 테스트
 
 프론트엔드 테스트를 실행합니다.
 
@@ -179,9 +197,14 @@ npx supabase db reset && npx supabase test db
 프론트엔드는 `main` 병합 시 Vercel이 자동 배포합니다. 백엔드는 다음처럼 수동 배포합니다.
 
 ```bash
+npx supabase functions delete signup-request
+npx supabase functions delete approve-signup
+npx supabase functions list
 npx supabase db push
-npx supabase functions deploy nearby place-photo signup-request approve-signup
+npx supabase functions deploy nearby place-photo
 ```
+
+앞의 두 삭제 명령은 기존 관리자 승인 함수를 배포했던 프로젝트에서 한 번만 실행합니다. 소스와 배포 명령에서 함수를 제외해도 원격 함수는 자동 삭제되지 않으므로, `functions list` 결과에 두 함수가 없는지 확인한 뒤 승인용 테이블 제거 마이그레이션을 배포합니다.
 
 ## 남은 작업
 
@@ -192,8 +215,7 @@ npx supabase functions deploy nearby place-photo signup-request approve-signup
 
 ### 후속 개선(병합 차단 아님)
 
-- [ ] 사용자 초대 메일은 Supabase 내장 발송을 사용합니다. 발송량이 내장 한도를 넘으면 Supabase Auth에 별도 SMTP를 설정해야 하며, 이때는 도메인이 필요합니다.
-- [x] `app/set-password`와 `app/admin/approve`의 Supabase 직접 호출을 기존 데이터 레이어 패턴으로 옮겼습니다.
+- [ ] 회원가입 인증 메일은 Supabase 내장 발송을 사용합니다. 발송량이 내장 한도를 넘으면 Supabase Auth에 별도 SMTP를 설정해야 하며, 이때는 발신 도메인 인증이 필요합니다.
 - [ ] 지도 마커는 `google.maps.Marker`를 사용합니다. 후속 대체재인 `AdvancedMarkerElement`는 GCP 콘솔에서 발급하는 Map ID가 필요해 별도로 다룹니다.
 - [ ] 서버 렌더링에서 민감 데이터를 다루게 되면 `@supabase/ssr`로 전환하여 서버에서 실제 세션과 JWT를 검증합니다. 현재 `sb-session` 마커 쿠키는 사용자 경험을 위한 가드이며 실제 데이터 보호는 RLS가 담당합니다.
 
@@ -201,6 +223,8 @@ npx supabase functions deploy nearby place-photo signup-request approve-signup
 
 - 스펙: [`docs/superpowers/specs/2026-07-21-lunch-recommender-design.md`](docs/superpowers/specs/2026-07-21-lunch-recommender-design.md)
 - 구현 계획: [`docs/superpowers/plans/2026-07-21-lunch-recommender.md`](docs/superpowers/plans/2026-07-21-lunch-recommender.md)
-- 관리자 승인 회원가입: [`docs/superpowers/specs/2026-07-23-signup-approval-design.md`](docs/superpowers/specs/2026-07-23-signup-approval-design.md)
+- 이메일 인증 회원가입: [`docs/superpowers/specs/2026-07-25-email-verification-signup-design.md`](docs/superpowers/specs/2026-07-25-email-verification-signup-design.md)
+- 이메일 인증 회원가입 구현 계획: [`docs/superpowers/plans/2026-07-25-email-verification-signup.md`](docs/superpowers/plans/2026-07-25-email-verification-signup.md)
 - 프론트엔드 데이터 레이어: [`docs/superpowers/specs/2026-07-23-fe-data-layer-refactor-design.md`](docs/superpowers/specs/2026-07-23-fe-data-layer-refactor-design.md)
-- 관리자 알림 채널(Discord): [`docs/superpowers/specs/2026-07-24-admin-notify-discord-design.md`](docs/superpowers/specs/2026-07-24-admin-notify-discord-design.md)
+- 대체된 설계 — 관리자 승인 회원가입: [`docs/superpowers/specs/2026-07-23-signup-approval-design.md`](docs/superpowers/specs/2026-07-23-signup-approval-design.md)
+- 대체된 설계 — 관리자 알림 채널(Discord): [`docs/superpowers/specs/2026-07-24-admin-notify-discord-design.md`](docs/superpowers/specs/2026-07-24-admin-notify-discord-design.md)
