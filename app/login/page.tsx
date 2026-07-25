@@ -5,7 +5,7 @@ import AuthTurnstile, { type AuthTurnstileHandle } from '../../components/AuthTu
 import Spinner from '../../components/Spinner';
 import { ROUTES } from '../../lib/constants';
 import { useResendSignupEmail, useSignIn, useSignUp } from '../../lib/hooks/mutations';
-import { errorMessage } from '../../lib/messages';
+import { errorMessage, MESSAGES } from '../../lib/messages';
 import styles from './login.module.css';
 
 type SignInFormValues = {
@@ -117,7 +117,7 @@ export default function LoginPage() {
   return (
     <div className={styles.wrap}>
       <div className={styles.card}>
-        <h1 className={styles.title}>점심 추천</h1>
+        <h1 className={styles.title}>{MESSAGES.APP_NAME}</h1>
         <p className={styles.subtitle}>오늘 뭐 먹을지, 로그인하고 추천받아 보세요</p>
         <form className={styles.form} onSubmit={submit}>
           <label className={styles.field} htmlFor="email">

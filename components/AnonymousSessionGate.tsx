@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { ensureSession, getCurrentUser } from '../lib/api';
-import { errorMessage } from '../lib/messages';
+import { errorMessage, MESSAGES } from '../lib/messages';
 import { supabase } from '../lib/supabaseClient';
 import AuthTurnstile, { type AuthTurnstileHandle } from './AuthTurnstile';
 import Spinner from './Spinner';
@@ -75,7 +75,7 @@ export default function AnonymousSessionGate({ children }: { children: ReactNode
   return (
     <main className={styles.wrap}>
       <section className={styles.card} aria-busy="true">
-        <h1 className={styles.title}>점심 추천</h1>
+        <h1 className={styles.title}>{MESSAGES.APP_NAME}</h1>
         <p className={styles.description}>안전한 이용을 위해 잠시만 기다려 주세요.</p>
         <p className={styles.status} role="status">
           <Spinner />

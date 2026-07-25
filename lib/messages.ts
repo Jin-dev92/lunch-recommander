@@ -1,5 +1,6 @@
 // 사용자 노출 문구 단일 출처. 식별자(쿠키명·경로 등)는 lib/constants.ts에 둔다.
 export const MESSAGES = {
+  APP_NAME: '오늘 뭐먹지',
   LOGIN_REQUIRED: '로그인이 필요합니다.',
   NO_CANDIDATES: '추천할 음식점이 없습니다.',
   RATING_SAVE_FAILED: '평점 저장에 실패했습니다.',

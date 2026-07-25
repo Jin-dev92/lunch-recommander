@@ -8,7 +8,7 @@ import Spinner from '../components/Spinner';
 import { ROUTES } from '../lib/constants';
 import { useAuth } from '../lib/hooks/useAuth';
 import { useSignOut } from '../lib/hooks/mutations';
-import { errorMessage } from '../lib/messages';
+import { errorMessage, MESSAGES } from '../lib/messages';
 import {
   DEFAULT_RECOMMENDATION_CRITERIA,
   type RecommendationCriteria,
@@ -28,7 +28,7 @@ export default function HomePage() {
   return (
     <main className={styles.main}>
       <header className={styles.header}>
-        <h1 className={styles.title}>점심 추천</h1>
+        <h1 className={styles.title}>{MESSAGES.APP_NAME}</h1>
         <nav className={styles.actions}>
           {isLoggedIn ? (
             <>
