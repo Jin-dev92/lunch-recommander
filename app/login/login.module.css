@@ -113,7 +113,7 @@
   text-align: center;
 }
 
-/* 로그인이 주 동작이므로 회원가입 요청은 외곽선 버튼으로 한 단계 낮춘다. */
+/* 로그인이 주 동작이므로 회원가입은 외곽선 버튼으로 한 단계 낮춘다. */
 .secondaryButton {
   display: block;
   width: 100%;
