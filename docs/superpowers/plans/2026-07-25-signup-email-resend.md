@@ -35,12 +35,14 @@
 ### Task 1: 인증 메일 재전송 API
 
 **Files:**
+
 - Modify: `lib/types/api/auth.types.ts`
 - Modify: `lib/messages.ts`
 - Modify: `lib/api/auth.ts`
 - Test: `lib/api/auth.test.ts`
 
 **Interfaces:**
+
 - Produces: `ResendSignupEmailRequest = { email: string; captchaToken: string; emailRedirectTo: string }`
 - Produces: `resendSignupEmail(request: ResendSignupEmailRequest): Promise<string>`
 - Returns: 성공 시 `MESSAGES.SIGNUP_CONFIRM_EMAIL_RESENT`
@@ -146,10 +148,12 @@ git commit -m "feat: 가입 인증 메일 재전송 API 추가"
 ### Task 2: 재전송 React Query mutation
 
 **Files:**
+
 - Modify: `lib/hooks/mutations/useAuthMutations.ts`
 - Test: `lib/hooks/mutations/useAuthMutations.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `resendSignupEmail(request: ResendSignupEmailRequest): Promise<string>`
 - Produces: `useResendSignupEmail(options?: UseMutationOptions<string, Error, ResendSignupEmailRequest>)`
 - Invariant: 성공 시 기존 Query Client 캐시를 유지한다.
@@ -175,9 +179,7 @@ it('인증 메일을 재전송하고 기존 캐시는 유지합니다', async ()
   };
 
   await act(async () => {
-    await expect(result.current.mutateAsync(request)).resolves.toBe(
-      '인증 메일을 다시 보냈습니다.',
-    );
+    await expect(result.current.mutateAsync(request)).resolves.toBe('인증 메일을 다시 보냈습니다.');
   });
 
   expect(resendSignupEmailMock).toHaveBeenCalledWith(request);
@@ -219,11 +221,13 @@ git commit -m "feat: 인증 메일 재전송 mutation 추가"
 ### Task 3: 가입 완료 및 재전송 UI
 
 **Files:**
+
 - Modify: `app/login/page.tsx`
 - Modify: `app/login/login.module.css`
 - Test: `app/login/page.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `useResendSignupEmail()`
 - Consumes: `AuthTurnstileHandle.reset()`
 - State: `signupEmail: string`, `resendCaptchaToken: string`, `resendCooldown: number`
@@ -274,9 +278,7 @@ it('재전송 요청 중 공통 스피너를 보여줍니다', async () => {
 it('재전송 성공 후 60초 쿨다운과 성공 안내를 표시합니다', async () => {
   vi.useFakeTimers();
   // 재전송 성공
-  expect(within(dialog).getByRole('status')).toHaveTextContent(
-    '인증 메일을 다시 보냈습니다.',
-  );
+  expect(within(dialog).getByRole('status')).toHaveTextContent('인증 메일을 다시 보냈습니다.');
   expect(within(dialog).getByRole('button', { name: '60초 후 재전송' })).toBeDisabled();
   await act(() => vi.advanceTimersByTimeAsync(1_000));
   expect(within(dialog).getByRole('button', { name: '59초 후 재전송' })).toBeDisabled();
@@ -326,7 +328,7 @@ resendEmail.isPending
   ? '재전송 중…'
   : resendCooldown > 0
     ? `${resendCooldown}초 후 재전송`
-    : '인증 메일 재전송'
+    : '인증 메일 재전송';
 ```
 
 - [ ] **Step 6: 기존 스타일에 맞는 완료 화면 CSS 추가**
@@ -366,9 +368,11 @@ git commit -m "feat: 가입 인증 메일 재전송 UI 추가"
 ### Task 4: 전체 검증
 
 **Files:**
+
 - Verify only
 
 **Interfaces:**
+
 - 전체 인증 API·mutation·화면이 타입과 런타임 계약을 공유한다.
 
 - [ ] **Step 1: 관련 테스트 실행**

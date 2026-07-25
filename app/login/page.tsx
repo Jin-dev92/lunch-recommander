@@ -188,18 +188,14 @@ export default function LoginPage() {
               {signUp.data}
             </p>
             <p className={styles.confirmationEmail}>{signupEmail}</p>
-            <p className={styles.resendHelp}>
-              메일함과 스팸함에서 인증 링크를 확인해 주세요.
-            </p>
+            <p className={styles.resendHelp}>메일함과 스팸함에서 인증 링크를 확인해 주세요.</p>
             <div className={styles.captcha}>
               <AuthTurnstile ref={resendCaptcha} onTokenChange={setResendCaptchaToken} />
             </div>
             <button
               className={styles.button}
               type="button"
-              disabled={
-                resendSignupEmail.isPending || resendCooldown > 0 || !resendCaptchaToken
-              }
+              disabled={resendSignupEmail.isPending || resendCooldown > 0 || !resendCaptchaToken}
               aria-busy={resendSignupEmail.isPending}
               onClick={resendEmail}
             >
@@ -266,8 +262,7 @@ export default function LoginPage() {
                   {...signupForm.register('passwordConfirm', {
                     required: true,
                     validate: (value) =>
-                      value === signupForm.getValues('password') ||
-                      '비밀번호가 일치하지 않습니다.',
+                      value === signupForm.getValues('password') || '비밀번호가 일치하지 않습니다.',
                   })}
                 />
               </label>
