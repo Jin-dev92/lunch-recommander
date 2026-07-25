@@ -1,7 +1,7 @@
 import { axiosInstance } from '../axiosInstance';
 import { API_ROUTES } from '../constants';
 import { MESSAGES } from '../messages';
-import { supabase } from '../supabaseClient';
+import { signupSupabase, supabase } from '../supabaseClient';
 import type {
   SignInRequest,
   SignupRequest,
@@ -22,9 +22,15 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
  * 세션이 없으면 익명 세션을 만든다. 로그인은 optional이지만 유료인 nearby 호출은 JWT 뒤에
  * 두어야 하므로, 방문자마다 익명 JWT를 발급해 인증·레이트리밋을 그대로 유지한다.
  */
-export async function ensureSession(): Promise<void> {
+export async function ensureSession(captchaToken: string): Promise<void> {
   const { data } = await supabase.auth.getSession();
-  if (!data.session) await supabase.auth.signInAnonymously();
+  if (!data.session) {
+    assertNoError(
+      await supabase.auth.signInAnonymously({
+        options: { captchaToken },
+      }),
+    );
+  }
 }
 
 export async function hasInviteSession(): Promise<boolean> {
@@ -33,8 +39,36 @@ export async function hasInviteSession(): Promise<boolean> {
   return Boolean(data.session) && !data.session?.user.is_anonymous;
 }
 
-export async function signIn({ email, password }: SignInRequest): Promise<void> {
-  assertNoError(await supabase.auth.signInWithPassword({ email, password }));
+export async function signIn({ email, password, captchaToken }: SignInRequest): Promise<void> {
+  assertNoError(
+    await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: { captchaToken },
+    }),
+  );
+}
+
+export async function signUp({
+  email,
+  password,
+  captchaToken,
+  emailRedirectTo,
+}: SignupRequest): Promise<string> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  if (data.session && !data.session.user.is_anonymous) {
+    throw new Error(MESSAGES.ALREADY_LOGGED_IN);
+  }
+
+  assertNoError(
+    await signupSupabase.auth.signUp({
+      email,
+      password,
+      options: { captchaToken, emailRedirectTo },
+    }),
+  );
+  return MESSAGES.SIGNUP_CONFIRM_EMAIL;
 }
 
 export async function updatePassword({ password }: UpdatePasswordRequest): Promise<void> {

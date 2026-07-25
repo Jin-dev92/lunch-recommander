@@ -1,6 +1,6 @@
 'use client';
 import { useMutation, useQueryClient, type UseMutationOptions } from '@tanstack/react-query';
-import { requestSignup, signIn, signOut, updatePassword } from '../../api';
+import { requestSignup, signIn, signOut, signUp, updatePassword } from '../../api';
 import type { SignInRequest, SignupRequest, UpdatePasswordRequest } from '../../types/api';
 
 // 로그인/로그아웃은 "누가 보고 있는가"를 바꾸므로 캐시된 서버 상태를 전부 버린다.
@@ -23,6 +23,17 @@ export const useRequestSignup = (options?: UseMutationOptions<string, Error, Sig
     mutationFn: (req: SignupRequest) => requestSignup(req),
     ...options,
   });
+
+export const useSignUp = (options?: UseMutationOptions<string, Error, SignupRequest>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: SignupRequest) => signUp(request),
+    onSuccess: () => {
+      queryClient.clear();
+    },
+    ...options,
+  });
+};
 
 export const useUpdatePassword = (
   options?: UseMutationOptions<void, Error, UpdatePasswordRequest>,
