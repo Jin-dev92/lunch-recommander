@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title>오늘 뭐먹지 밥그릇 아이콘</title>
+  <rect width="512" height="512" rx="112" fill="#fff7f4"/>
+  <path d="M205 166c-13-25 2-48 22-61M277 166c-13-25 2-48 22-61" fill="none" stroke="#c84f2e" stroke-linecap="round" stroke-width="18"/>
+  <path d="M126 231c0-37 58-67 130-67s130 30 130 67" fill="#fff" stroke="#a8442a" stroke-linecap="round" stroke-linejoin="round" stroke-width="18"/>
+  <path d="M99 235h314c-7 108-68 170-157 170S106 343 99 235Z" fill="#e8613a" stroke="#a8442a" stroke-linejoin="round" stroke-width="18"/>
+  <path d="M119 247c28 20 76 31 137 31s109-11 137-31" fill="none" stroke="#ffad91" stroke-linecap="round" stroke-width="14"/>
+</svg>
