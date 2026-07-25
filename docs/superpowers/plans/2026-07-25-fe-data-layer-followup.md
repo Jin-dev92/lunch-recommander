@@ -21,22 +21,23 @@
 
 ## 파일 구조
 
-| 파일 | 책임 |
-| --- | --- |
-| `lib/types/api/auth.types.ts` | 비밀번호 변경 요청 타입 |
-| `lib/types/api/signupApproval.types.ts` | 관리자 승인 조회·결정 요청과 응답 타입 |
-| `lib/api/auth.ts` | 초대 세션 판정과 비밀번호 변경 |
-| `lib/api/signupApproval.ts` | `approve-signup` Edge Function 호출 |
-| `lib/hooks/queries/useAuthQueries.ts` | 초대 세션 유효성 쿼리 |
-| `lib/hooks/queries/useSignupApprovalQueries.ts` | 토큰별 승인 요청 조회 쿼리 |
-| `lib/hooks/mutations/useAuthMutations.ts` | 비밀번호 변경 뮤테이션 |
-| `lib/hooks/mutations/useSignupApprovalMutations.ts` | 승인·거절 결정 뮤테이션 |
-| `app/set-password/page.tsx` | 비밀번호 설정 화면과 성공 후 이동 |
-| `app/admin/approve/page.tsx` | 승인 정보 및 결정 결과 표시 |
+| 파일                                                | 책임                                   |
+| --------------------------------------------------- | -------------------------------------- |
+| `lib/types/api/auth.types.ts`                       | 비밀번호 변경 요청 타입                |
+| `lib/types/api/signupApproval.types.ts`             | 관리자 승인 조회·결정 요청과 응답 타입 |
+| `lib/api/auth.ts`                                   | 초대 세션 판정과 비밀번호 변경         |
+| `lib/api/signupApproval.ts`                         | `approve-signup` Edge Function 호출    |
+| `lib/hooks/queries/useAuthQueries.ts`               | 초대 세션 유효성 쿼리                  |
+| `lib/hooks/queries/useSignupApprovalQueries.ts`     | 토큰별 승인 요청 조회 쿼리             |
+| `lib/hooks/mutations/useAuthMutations.ts`           | 비밀번호 변경 뮤테이션                 |
+| `lib/hooks/mutations/useSignupApprovalMutations.ts` | 승인·거절 결정 뮤테이션                |
+| `app/set-password/page.tsx`                         | 비밀번호 설정 화면과 성공 후 이동      |
+| `app/admin/approve/page.tsx`                        | 승인 정보 및 결정 결과 표시            |
 
 ### Task 1: API 함수와 타입 경계 추가
 
 **Files:**
+
 - Create: `lib/api/auth.test.ts`
 - Create: `lib/api/signupApproval.ts`
 - Create: `lib/api/signupApproval.test.ts`
@@ -47,6 +48,7 @@
 - Modify: `lib/types/api/index.ts`
 
 **Interfaces:**
+
 - Produces: `hasInviteSession(): Promise<boolean>`
 - Produces: `updatePassword({ password }: UpdatePasswordRequest): Promise<void>`
 - Produces: `getSignupApproval(token: string): Promise<SignupApprovalRequest>`
@@ -131,9 +133,9 @@ it('토큰으로 승인 요청 정보를 조회한다', async () => {
 
 it('승인 결정 오류를 예외로 승격한다', async () => {
   invoke.mockResolvedValue({ data: null, error: { message: '승인 실패' } });
-  await expect(
-    decideSignupApproval({ token: 'token-1', action: 'approve' }),
-  ).rejects.toThrow('승인 실패');
+  await expect(decideSignupApproval({ token: 'token-1', action: 'approve' })).rejects.toThrow(
+    '승인 실패',
+  );
 });
 ```
 
@@ -185,6 +187,7 @@ git commit -m "refactor: 인증과 승인 API 경계 추가"
 ### Task 2: 비밀번호 설정 페이지를 React Query로 전환
 
 **Files:**
+
 - Create: `lib/hooks/queries/useAuthQueries.ts`
 - Modify: `lib/hooks/queries/index.ts`
 - Modify: `lib/hooks/mutations/useAuthMutations.ts`
@@ -192,6 +195,7 @@ git commit -m "refactor: 인증과 승인 API 경계 추가"
 - Modify: `app/set-password/page.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `hasInviteSession(): Promise<boolean>`
 - Consumes: `updatePassword(request: UpdatePasswordRequest): Promise<void>`
 - Produces: `useInviteSession()`
@@ -277,6 +281,7 @@ git commit -m "refactor: 비밀번호 설정을 데이터 레이어로 이동"
 ### Task 3: 관리자 승인 페이지를 React Query로 전환
 
 **Files:**
+
 - Create: `lib/hooks/queries/useSignupApprovalQueries.ts`
 - Create: `lib/hooks/mutations/useSignupApprovalMutations.ts`
 - Modify: `lib/hooks/queries/index.ts`
@@ -285,6 +290,7 @@ git commit -m "refactor: 비밀번호 설정을 데이터 레이어로 이동"
 - Modify: `app/admin/approve/page.test.tsx`
 
 **Interfaces:**
+
 - Consumes: `getSignupApproval(token: string): Promise<SignupApprovalRequest>`
 - Consumes: `decideSignupApproval(request: SignupApprovalDecisionRequest): Promise<SignupApprovalDecisionResponse>`
 - Produces: `useSignupApproval(token: string)`
@@ -375,9 +381,11 @@ git commit -m "refactor: 관리자 승인을 데이터 레이어로 이동"
 ### Task 4: README와 전체 검증
 
 **Files:**
+
 - Modify: `README.md`
 
 **Interfaces:**
+
 - Consumes: Task 1~3의 완성된 데이터 레이어
 - Produces: 후속 개선 두 번째 항목의 완료 기록
 

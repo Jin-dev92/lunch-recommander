@@ -36,9 +36,9 @@ describe('관리자 회원가입 승인 API', () => {
   it('승인 결정을 제출합니다', async () => {
     invoke.mockResolvedValue({ data: { alreadyRegistered: false }, error: null });
 
-    await expect(
-      decideSignupApproval({ token: 'token-1', action: 'approve' }),
-    ).resolves.toEqual({ alreadyRegistered: false });
+    await expect(decideSignupApproval({ token: 'token-1', action: 'approve' })).resolves.toEqual({
+      alreadyRegistered: false,
+    });
     expect(invoke).toHaveBeenCalledWith('approve-signup', {
       body: { token: 'token-1', action: 'approve' },
     });
@@ -47,8 +47,8 @@ describe('관리자 회원가입 승인 API', () => {
   it('승인 결정 오류를 예외로 승격합니다', async () => {
     invoke.mockResolvedValue({ data: null, error: { message: '승인 실패' } });
 
-    await expect(
-      decideSignupApproval({ token: 'token-1', action: 'approve' }),
-    ).rejects.toThrow('승인 실패');
+    await expect(decideSignupApproval({ token: 'token-1', action: 'approve' })).rejects.toThrow(
+      '승인 실패',
+    );
   });
 });

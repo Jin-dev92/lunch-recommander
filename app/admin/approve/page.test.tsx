@@ -80,9 +80,7 @@ describe('관리자 회원가입 승인', () => {
   });
 
   it('만료·무효 토큰 안내를 표시합니다', async () => {
-    getSignupApprovalMock.mockRejectedValue(
-      new Error('만료되었거나 유효하지 않은 요청입니다.'),
-    );
+    getSignupApprovalMock.mockRejectedValue(new Error('만료되었거나 유효하지 않은 요청입니다.'));
 
     renderWithQuery(<ApprovePage />);
 
