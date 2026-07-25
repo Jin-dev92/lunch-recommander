@@ -50,4 +50,12 @@ describe('인증 API', () => {
 
     await expect(updatePassword({ password: 'strong-password-1' })).rejects.toThrow('변경 실패');
   });
+
+  it('비밀번호 변경 요청 자체가 실패하면 기존 대체 문구를 사용합니다', async () => {
+    updateUser.mockRejectedValue(new Error('network down'));
+
+    await expect(updatePassword({ password: 'strong-password-1' })).rejects.toThrow(
+      '비밀번호 설정 중 오류가 발생했습니다. 다시 시도해 주세요.',
+    );
+  });
 });

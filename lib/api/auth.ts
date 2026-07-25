@@ -38,7 +38,13 @@ export async function signIn({ email, password }: SignInRequest): Promise<void> 
 }
 
 export async function updatePassword({ password }: UpdatePasswordRequest): Promise<void> {
-  assertNoError(await supabase.auth.updateUser({ password }));
+  let result: Awaited<ReturnType<typeof supabase.auth.updateUser>>;
+  try {
+    result = await supabase.auth.updateUser({ password });
+  } catch {
+    throw new Error(MESSAGES.PASSWORD_UPDATE_FAILED);
+  }
+  assertNoError(result);
 }
 
 export async function signOut(): Promise<void> {
