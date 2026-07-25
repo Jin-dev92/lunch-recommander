@@ -1,57 +1,31 @@
 'use client';
-import { FormEvent, useEffect, useState } from 'react';
-import { ROUTES } from '../../lib/constants';
-import { supabase } from '../../lib/supabaseClient';
-import styles from '../login/login.module.css';
+import { FormEvent } from 'react';
 import Spinner from '../../components/Spinner';
+import { ROUTES } from '../../lib/constants';
+import { useUpdatePassword } from '../../lib/hooks/mutations';
+import { useInviteSession } from '../../lib/hooks/queries';
+import { errorMessage } from '../../lib/messages';
+import styles from '../login/login.module.css';
 
 export default function SetPasswordPage() {
-  const [ready, setReady] = useState(false);
-  const [hasSession, setHasSession] = useState(false);
-  const [sessionError, setSessionError] = useState('');
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const inviteSession = useInviteSession();
+  const passwordMutation = useUpdatePassword();
 
-  useEffect(() => {
-    (async () => {
-      try {
-        // 로그인이 optional이라 방문자에겐 익명 세션이 있을 수 있다. 익명 세션은 초대가 아니므로
-        // 실사용자 세션(초대 링크가 세운다)일 때만 비밀번호 설정을 허용한다.
-        const { data } = await supabase.auth.getSession();
-        setHasSession(Boolean(data.session) && !data.session?.user.is_anonymous);
-      } catch {
-        setSessionError('초대 정보를 확인하지 못했습니다. 다시 시도해 주세요.');
-      } finally {
-        setReady(true);
-      }
-    })();
-  }, []);
-
-  async function submit(e: FormEvent<HTMLFormElement>) {
+  function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setLoading(true);
-    setMessage('');
-    setError('');
     const password = String(new FormData(e.currentTarget).get('password'));
-    try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) setError(error.message);
-      else {
-        setMessage('비밀번호를 설정했습니다. 잠시 후 이동합니다.');
-        setSuccess(true);
-        // 초대 링크로 이미 실사용자 세션이 서 있으므로 다시 로그인시키지 않고 홈으로 보낸다.
-        location.assign(ROUTES.HOME);
-      }
-    } catch {
-      setError('비밀번호 설정 중 오류가 발생했습니다. 다시 시도해 주세요.');
-    } finally {
-      setLoading(false);
-    }
+    passwordMutation.mutate(
+      { password },
+      {
+        onSuccess: () => {
+          // 초대 링크로 이미 실사용자 세션이 서 있으므로 재로그인 없이 바로 메인으로 보낸다.
+          location.assign(ROUTES.HOME);
+        },
+      },
+    );
   }
 
-  if (!ready) {
+  if (inviteSession.isPending) {
     return (
       <div className={styles.wrap}>
         <div className={styles.card}>
@@ -61,19 +35,19 @@ export default function SetPasswordPage() {
     );
   }
 
-  if (sessionError) {
+  if (inviteSession.isError) {
     return (
       <div className={styles.wrap}>
         <div className={styles.card}>
           <p className={styles.error} role="alert">
-            {sessionError}
+            초대 정보를 확인하지 못했습니다. 다시 시도해 주세요.
           </p>
         </div>
       </div>
     );
   }
 
-  if (!hasSession) {
+  if (!inviteSession.data) {
     return (
       <div className={styles.wrap}>
         <div className={styles.card}>
@@ -105,10 +79,10 @@ export default function SetPasswordPage() {
           <button
             className={styles.button}
             type="submit"
-            disabled={loading || success}
-            aria-busy={loading}
+            disabled={passwordMutation.isPending || passwordMutation.isSuccess}
+            aria-busy={passwordMutation.isPending}
           >
-            {loading ? (
+            {passwordMutation.isPending ? (
               <>
                 <Spinner />
                 설정 중…
@@ -117,10 +91,12 @@ export default function SetPasswordPage() {
               '비밀번호 설정'
             )}
           </button>
-          {message && <p role="status">{message}</p>}
-          {error && (
+          {passwordMutation.isSuccess && (
+            <p role="status">비밀번호를 설정했습니다. 잠시 후 이동합니다.</p>
+          )}
+          {passwordMutation.error && (
             <p className={styles.error} role="alert">
-              {error}
+              {errorMessage(passwordMutation.error)}
             </p>
           )}
         </form>
