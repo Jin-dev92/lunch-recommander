@@ -193,7 +193,7 @@ npx supabase functions deploy nearby place-photo signup-request approve-signup
 ### 후속 개선(병합 차단 아님)
 
 - [ ] 사용자 초대 메일은 Supabase 내장 발송을 사용합니다. 발송량이 내장 한도를 넘으면 Supabase Auth에 별도 SMTP를 설정해야 하며, 이때는 도메인이 필요합니다.
-- [ ] `app/set-password`와 `app/admin/approve`는 아직 데이터 레이어를 거치지 않고 Supabase를 직접 호출합니다. 나머지 화면과 같은 패턴으로 옮길 수 있습니다.
+- [x] `app/set-password`와 `app/admin/approve`의 Supabase 직접 호출을 기존 데이터 레이어 패턴으로 옮겼습니다.
 - [ ] 지도 마커는 `google.maps.Marker`를 사용합니다. 후속 대체재인 `AdvancedMarkerElement`는 GCP 콘솔에서 발급하는 Map ID가 필요해 별도로 다룹니다.
 - [ ] 서버 렌더링에서 민감 데이터를 다루게 되면 `@supabase/ssr`로 전환하여 서버에서 실제 세션과 JWT를 검증합니다. 현재 `sb-session` 마커 쿠키는 사용자 경험을 위한 가드이며 실제 데이터 보호는 RLS가 담당합니다.
 
