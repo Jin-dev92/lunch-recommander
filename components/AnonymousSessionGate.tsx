@@ -13,18 +13,26 @@ export default function AnonymousSessionGate({ children }: { children: ReactNode
   const pathname = usePathname();
   const turnstileRef = useRef<AuthTurnstileHandle>(null);
   const [ready, setReady] = useState(pathname === '/login');
+  const [checkedPathname, setCheckedPathname] = useState(pathname);
   const [checking, setChecking] = useState(pathname !== '/login');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (pathname === '/login') return;
+    if (pathname === '/login') {
+      setReady(true);
+      setChecking(false);
+      setCheckedPathname(pathname);
+      return;
+    }
 
     let active = true;
+    setChecking(true);
     getCurrentUser()
       .then((user) => {
         if (!active) return;
         setReady(Boolean(user));
+        setCheckedPathname(pathname);
         setChecking(false);
       })
       .catch((cause) => {
@@ -36,6 +44,7 @@ export default function AnonymousSessionGate({ children }: { children: ReactNode
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return;
       setReady(Boolean(session));
+      setCheckedPathname(pathname);
       if (!session) setCreating(false);
     });
 
@@ -52,6 +61,7 @@ export default function AnonymousSessionGate({ children }: { children: ReactNode
     try {
       await ensureSession(token);
       setReady(true);
+      setCheckedPathname(pathname);
     } catch (cause) {
       setError(errorMessage(cause));
       turnstileRef.current?.reset();
@@ -60,7 +70,7 @@ export default function AnonymousSessionGate({ children }: { children: ReactNode
     }
   }
 
-  if (ready) return children;
+  if (pathname === '/login' || (ready && checkedPathname === pathname)) return children;
 
   return (
     <main className={styles.wrap}>

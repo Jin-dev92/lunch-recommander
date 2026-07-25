@@ -599,12 +599,15 @@ Expected: 남은 전체 테스트 통과
 Run:
 
 ```bash
-git diff --name-only -z origin/main...HEAD | xargs -0 npx prettier --check
+git diff --name-only --diff-filter=ACMR origin/main...HEAD \
+  | rg '\.(ts|tsx|js|jsx|json|css|md)$' \
+  | xargs npx prettier --check
 ```
 
-Expected: 이번 변경 파일 모두 통과
+Expected: Prettier가 지원하는 이번 변경 파일 모두 통과
 
-저장소 전체 `format:check`가 기존 파일 때문에 실패하면 기존 기준선과 이번 변경을 분리해 보고한다.
+`.env`, TOML, SQL은 이 저장소의 Prettier 파서 대상이 아니므로 `git diff --check`, Supabase
+config 파싱, 실제 DB reset으로 별도 검증한다.
 
 - [ ] **Step 5: 프로덕션 빌드**
 
@@ -647,7 +650,9 @@ git rebase origin/main
 npm run typecheck
 npm run lint
 npm test -- --run
-git diff --name-only -z origin/main...HEAD | xargs -0 npx prettier --check
+git diff --name-only --diff-filter=ACMR origin/main...HEAD \
+  | rg '\.(ts|tsx|js|jsx|json|css|md)$' \
+  | xargs npx prettier --check
 git push --force-with-lease -u origin feature/email-verification-signup
 ```
 
@@ -663,3 +668,5 @@ PR 제목·본문·체크리스트는 한글로 작성한다. PR 본문에 다�
 - Cloudflare Turnstile 도메인과 site key
 - Supabase Dashboard Turnstile secret
 - Auth rate limit·메일 발송 한도 확인
+- 원격 `signup-request`, `approve-signup` Edge Function 삭제와 목록 확인
+- 실제 인증 메일 링크 클릭 후 비익명 로그인 smoke test

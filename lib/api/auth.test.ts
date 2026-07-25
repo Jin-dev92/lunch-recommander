@@ -64,6 +64,18 @@ describe('인증 API', () => {
     });
   });
 
+  it('세션 확인 오류를 익명 세션 생성 오류로 가리지 않습니다', async () => {
+    getSession.mockResolvedValue({
+      data: { session: null },
+      error: { message: '세션 확인 실패' },
+    });
+
+    await expect(ensureSession('captcha-token')).rejects.toMatchObject({
+      message: '세션 확인 실패',
+    });
+    expect(signInAnonymously).not.toHaveBeenCalled();
+  });
+
   it('기존 익명 세션을 유지한 채 비영속 클라이언트로 가입합니다', async () => {
     getSession.mockResolvedValue({
       data: { session: { user: { is_anonymous: true } } },

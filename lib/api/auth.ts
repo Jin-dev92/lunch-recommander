@@ -16,7 +16,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
  * 두어야 하므로, 방문자마다 익명 JWT를 발급해 인증·레이트리밋을 그대로 유지한다.
  */
 export async function ensureSession(captchaToken: string): Promise<void> {
-  const { data } = await supabase.auth.getSession();
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
   if (!data.session) {
     assertNoError(
       await supabase.auth.signInAnonymously({

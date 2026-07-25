@@ -76,6 +76,27 @@ describe('AnonymousSessionGate', () => {
     expect(mocks.ensureSession).not.toHaveBeenCalled();
   });
 
+  it('로그인 경로에서 홈으로 이동하면 CAPTCHA 확인 전 화면을 차단합니다', async () => {
+    mocks.pathname = '/login';
+    mocks.getCurrentUser.mockResolvedValue(null);
+    const { rerender } = render(
+      <AnonymousSessionGate>
+        <p>현재 화면</p>
+      </AnonymousSessionGate>,
+    );
+    expect(await screen.findByText('현재 화면')).toBeInTheDocument();
+
+    mocks.pathname = '/';
+    rerender(
+      <AnonymousSessionGate>
+        <p>현재 화면</p>
+      </AnonymousSessionGate>,
+    );
+
+    expect(screen.queryByText('현재 화면')).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'CAPTCHA 확인' })).toBeInTheDocument();
+  });
+
   it('신규 방문자는 CAPTCHA 검증 후 익명 세션으로 진입합니다', async () => {
     mocks.getCurrentUser.mockResolvedValue(null);
     mocks.ensureSession.mockResolvedValue(undefined);

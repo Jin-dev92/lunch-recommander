@@ -10,6 +10,7 @@ export const signupSupabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   {
     auth: {
+      storageKey: 'lunch-recommender-signup-auth',
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,

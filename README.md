@@ -164,6 +164,7 @@ Supabase Dashboard에서 다음을 설정합니다.
 - Authentication > URL Configuration의 Site URL을 실제 배포 주소로 설정하고, Redirect URL에 실제 배포 주소와 필요한 Vercel Preview 주소를 정확히 등록합니다.
 - Authentication > Bot and Abuse Protection에서 Cloudflare Turnstile을 선택하고 secret key를 저장합니다.
 - Auth의 로그인·가입·익명 사용자 IP rate limit과 인증 메일 발송 한도를 서비스 규모에 맞게 확인합니다.
+- 실제 주소로 가입한 뒤 인증 링크를 열어 홈에서 비익명 로그인 상태가 되는지 smoke test합니다.
 
 ### 7. 개발 서버 실행
 
@@ -196,9 +197,14 @@ npx supabase db reset && npx supabase test db
 프론트엔드는 `main` 병합 시 Vercel이 자동 배포합니다. 백엔드는 다음처럼 수동 배포합니다.
 
 ```bash
+npx supabase functions delete signup-request
+npx supabase functions delete approve-signup
+npx supabase functions list
 npx supabase db push
 npx supabase functions deploy nearby place-photo
 ```
+
+앞의 두 삭제 명령은 기존 관리자 승인 함수를 배포했던 프로젝트에서 한 번만 실행합니다. 소스와 배포 명령에서 함수를 제외해도 원격 함수는 자동 삭제되지 않으므로, `functions list` 결과에 두 함수가 없는지 확인한 뒤 승인용 테이블 제거 마이그레이션을 배포합니다.
 
 ## 남은 작업
 
