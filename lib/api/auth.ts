@@ -2,7 +2,12 @@ import { axiosInstance } from '../axiosInstance';
 import { API_ROUTES } from '../constants';
 import { MESSAGES } from '../messages';
 import { supabase } from '../supabaseClient';
-import type { SignInRequest, SignupRequest, SignupRequestResponse } from '../types/api';
+import type {
+  SignInRequest,
+  SignupRequest,
+  SignupRequestResponse,
+  UpdatePasswordRequest,
+} from '../types/api';
 import { assertNoError } from './unwrap';
 
 export type CurrentUser = { id: string; isAnonymous: boolean };
@@ -22,8 +27,18 @@ export async function ensureSession(): Promise<void> {
   if (!data.session) await supabase.auth.signInAnonymously();
 }
 
+export async function hasInviteSession(): Promise<boolean> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return Boolean(data.session) && !data.session?.user.is_anonymous;
+}
+
 export async function signIn({ email, password }: SignInRequest): Promise<void> {
   assertNoError(await supabase.auth.signInWithPassword({ email, password }));
+}
+
+export async function updatePassword({ password }: UpdatePasswordRequest): Promise<void> {
+  assertNoError(await supabase.auth.updateUser({ password }));
 }
 
 export async function signOut(): Promise<void> {
