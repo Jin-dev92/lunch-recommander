@@ -30,6 +30,9 @@ const mapMock = vi.fn();
 const markerMock = vi.fn();
 let listeners: Record<string, (event: unknown) => void>;
 const setPosition = vi.fn();
+const setVisible = vi.fn();
+const setCenter = vi.fn();
+const setZoom = vi.fn();
 
 function latLng(lat: number, lng: number) {
   return { lat: () => lat, lng: () => lng };
@@ -39,13 +42,16 @@ beforeEach(() => {
   scriptShouldFail = false;
   listeners = {};
   setPosition.mockReset();
+  setVisible.mockReset();
+  setCenter.mockReset();
+  setZoom.mockReset();
   const addListener = (event: string, handler: (e: unknown) => void) => {
     listeners[event] = handler;
   };
   mapMock.mockReset();
   markerMock.mockReset();
-  mapMock.mockImplementation(() => ({ addListener }));
-  markerMock.mockImplementation(() => ({ addListener, setPosition }));
+  mapMock.mockImplementation(() => ({ addListener, setCenter, setZoom }));
+  markerMock.mockImplementation(() => ({ addListener, setPosition, setVisible }));
   // 실제 SDK는 loading=async에서 요청한 라이브러리만 채운다. Map은 'maps', Marker는 'marker'
   // 소속이며 전역 google.maps에는 놓이지 않는다. 목이 전역에 다 얹어두면 라이브러리를
   // 빠뜨린 코드가 테스트를 통과해 버리므로, 여기서도 importLibrary로만 제공한다.
@@ -61,6 +67,26 @@ beforeEach(() => {
 });
 
 describe('지도', () => {
+  it('첫 위치 응답을 기다리는 동안에도 기본 서울 지도를 만듭니다', async () => {
+    vi.stubGlobal('navigator', {
+      geolocation: { getCurrentPosition: vi.fn() },
+    });
+
+    render(<Map onLocationChange={vi.fn()} />);
+
+    await waitFor(() =>
+      expect(mapMock).toHaveBeenCalledWith(expect.anything(), {
+        center: { lat: 37.5665, lng: 126.978 },
+        zoom: 13,
+      }),
+    );
+    expect(markerMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        visible: false,
+      }),
+    );
+  });
+
   it('검색 반경과 추천 품질 조건을 제공합니다', () => {
     vi.stubGlobal('navigator', {
       geolocation: { getCurrentPosition: vi.fn() },

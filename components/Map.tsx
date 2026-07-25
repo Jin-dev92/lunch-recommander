@@ -14,6 +14,7 @@ import styles from './Map.module.css';
 import Spinner from './Spinner';
 
 type Coords = { lat: number; lng: number };
+const DEFAULT_MAP_CENTER: Coords = { lat: 37.5665, lng: 126.978 };
 
 // loading=async는 Google이 권장하는 로딩 방식이다(생략하면 콘솔 경고가 뜬다). 대신 스크립트가
 // 비동기로 들어오므로 google 전역이 언제 준비되는지 알 수 없어, onReady + importLibrary로 기다린다.
@@ -33,6 +34,7 @@ export default function Map({
   const node = useRef<HTMLDivElement>(null);
   // 지도 인스턴스는 최초 1회만 만든다. 이 ref가 "이미 생성됨" 표시 역할도 한다.
   const mapRef = useRef<google.maps.Map | null>(null);
+  const markerRef = useRef<google.maps.Marker | null>(null);
   const [sdkReady, setSdkReady] = useState(false);
   const [radius, setRadius] = useState<SearchLocation['radius']>(500);
   const [minGoogleRating, setMinGoogleRating] = useState<MinimumGoogleRating>(
@@ -85,10 +87,10 @@ export default function Map({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coords?.lat, coords?.lng, radius]);
 
-  // 좌표와 SDK가 모두 준비됐을 때 지도를 만든다. 둘 중 어느 쪽이 먼저 와도 상관없다.
-  // 이후 좌표 변경(핀 이동)으로는 다시 만들지 않는다.
+  // SDK만 준비되면 기본 서울 지도를 먼저 만든다. 첫 방문자의 위치 권한 응답이 늦거나
+  // 실패해도 빈 영역으로 남지 않으며, 좌표가 준비되면 아래 effect가 중심과 핀을 옮긴다.
   useEffect(() => {
-    if (!coords || !sdkReady || mapRef.current) return;
+    if (!sdkReady || mapRef.current) return;
     let cancelled = false;
 
     (async () => {
@@ -101,28 +103,43 @@ export default function Map({
       // 라이브러리를 기다리는 사이 언마운트됐거나 다른 경로로 이미 만들어졌으면 중단한다.
       if (cancelled || mapRef.current || !node.current) return;
 
-      const map = new GoogleMap(node.current, { center: coords, zoom: 16 });
+      const initialCenter = coords ?? DEFAULT_MAP_CENTER;
+      const map = new GoogleMap(node.current, {
+        center: initialCenter,
+        zoom: coords ? 16 : 13,
+      });
       // 고정밀 측위도 실내나 데스크톱에서는 빗나가므로 사용자가 직접 보정할 수 있어야 한다.
       const marker = new Marker({
-        position: coords,
+        position: initialCenter,
         map,
         draggable: true,
         title: MESSAGES.MAP_ADJUST_HINT,
+        visible: Boolean(coords),
       });
       const moveTo = (latLng: google.maps.LatLng | null) => {
         if (!latLng) return;
         marker.setPosition(latLng);
+        marker.setVisible(true);
         setCoords({ lat: latLng.lat(), lng: latLng.lng() });
       };
       marker.addListener('dragend', (event: google.maps.MapMouseEvent) => moveTo(event.latLng));
       map.addListener('click', (event: google.maps.MapMouseEvent) => moveTo(event.latLng));
       mapRef.current = map;
+      markerRef.current = marker;
     })().catch(() => setError(MESSAGES.MAP_LOAD_FAILED));
 
     return () => {
       cancelled = true;
     };
   }, [coords, sdkReady]);
+
+  useEffect(() => {
+    if (!coords || !mapRef.current || !markerRef.current) return;
+    mapRef.current.setCenter(coords);
+    mapRef.current.setZoom(16);
+    markerRef.current.setPosition(coords);
+    markerRef.current.setVisible(true);
+  }, [coords]);
 
   return (
     <section className={styles.section}>
