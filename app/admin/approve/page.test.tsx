@@ -79,6 +79,36 @@ describe('관리자 회원가입 승인', () => {
     expect(decideSignupApprovalMock).toHaveBeenCalledTimes(1);
   });
 
+  it('이미 가입된 사용자는 별도 안내를 표시합니다', async () => {
+    getSignupApprovalMock.mockResolvedValue({
+      email: 'member@example.com',
+      status: 'pending',
+    });
+    decideSignupApprovalMock.mockResolvedValue({ alreadyRegistered: true });
+
+    renderWithQuery(<ApprovePage />);
+    fireEvent.click(await screen.findByRole('button', { name: '승인' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('이미 가입된 사용자입니다.');
+    expect(screen.queryByRole('button', { name: '승인' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '거절' })).not.toBeInTheDocument();
+  });
+
+  it('승인 결정 실패 시 오류를 표시하고 다시 시도할 수 있습니다', async () => {
+    getSignupApprovalMock.mockResolvedValue({
+      email: 'guest@example.com',
+      status: 'pending',
+    });
+    decideSignupApprovalMock.mockRejectedValue(new Error('승인 처리에 실패했습니다.'));
+
+    renderWithQuery(<ApprovePage />);
+    fireEvent.click(await screen.findByRole('button', { name: '승인' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('승인 처리에 실패했습니다.');
+    expect(screen.getByRole('button', { name: '승인' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '거절' })).toBeEnabled();
+  });
+
   it('만료·무효 토큰 안내를 표시합니다', async () => {
     getSignupApprovalMock.mockRejectedValue(new Error('만료되었거나 유효하지 않은 요청입니다.'));
 

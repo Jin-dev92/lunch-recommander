@@ -51,6 +51,14 @@ describe('인증 API', () => {
     await expect(updatePassword({ password: 'strong-password-1' })).rejects.toThrow('변경 실패');
   });
 
+  it('새 비밀번호를 Supabase Auth에 전달합니다', async () => {
+    updateUser.mockResolvedValue({ error: null });
+
+    await updatePassword({ password: 'strong-password-1' });
+
+    expect(updateUser).toHaveBeenCalledWith({ password: 'strong-password-1' });
+  });
+
   it('비밀번호 변경 요청 자체가 실패하면 기존 대체 문구를 사용합니다', async () => {
     updateUser.mockRejectedValue(new Error('network down'));
 
