@@ -22,8 +22,11 @@ function waitForMapsSdk(): Promise<typeof google.maps> {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
     const check = () => {
-      if (typeof google !== 'undefined' && google.maps?.importLibrary) {
-        resolve(google.maps);
+      const maps = (globalThis as unknown as {
+        google?: { maps?: { importLibrary?: unknown } };
+      }).google?.maps;
+      if (maps && typeof maps.importLibrary === 'function') {
+        resolve(maps as typeof google.maps);
         return;
       }
       if (Date.now() - startedAt >= MAPS_SDK_TIMEOUT_MS) {

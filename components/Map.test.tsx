@@ -105,9 +105,9 @@ describe('지도', () => {
   it('스크립트 준비 직후 Google Maps 라이브러리가 늦게 노출돼도 지도를 만듭니다', async () => {
     const maps = (globalThis as unknown as { google: typeof google }).google.maps;
     const importLibrary = maps.importLibrary;
-    (maps as typeof maps & { importLibrary?: typeof importLibrary }).importLibrary = undefined;
+    Object.defineProperty(maps, 'importLibrary', { value: undefined, configurable: true });
     window.setTimeout(() => {
-      maps.importLibrary = importLibrary;
+      Object.defineProperty(maps, 'importLibrary', { value: importLibrary, configurable: true });
     }, 10);
     vi.stubGlobal('navigator', {
       geolocation: { getCurrentPosition: vi.fn() },
