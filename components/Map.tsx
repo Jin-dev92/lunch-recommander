@@ -141,6 +141,7 @@ export default function Map({
       const map = new GoogleMap(node.current, {
         center: initialCenter,
         zoom: coords ? 16 : 13,
+        mapTypeControl: false,
       });
       // 고정밀 측위도 실내나 데스크톱에서는 빗나가므로 사용자가 직접 보정할 수 있어야 한다.
       const marker = new Marker({
