@@ -67,7 +67,7 @@
 .refreshButton {
   position: absolute !important;
   top: 12px;
-  right: 12px;
+  left: 12px;
   z-index: 2;
   color: var(--color-accent) !important;
   background: var(--color-surface) !important;
