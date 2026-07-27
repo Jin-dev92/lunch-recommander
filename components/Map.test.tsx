@@ -80,6 +80,7 @@ describe('지도', () => {
       expect(mapMock).toHaveBeenCalledWith(expect.anything(), {
         center: { lat: 37.5665, lng: 126.978 },
         zoom: 13,
+        mapTypeControl: false,
       }),
     );
     expect(markerMock).toHaveBeenCalledWith(
@@ -174,6 +175,7 @@ describe('지도', () => {
     expect(mapMock).toHaveBeenCalledWith(expect.anything(), {
       center: { lat: 37.5, lng: 127.0 },
       zoom: 16,
+      mapTypeControl: false,
     });
     expect(markerMock).toHaveBeenCalledWith(
       expect.objectContaining({
