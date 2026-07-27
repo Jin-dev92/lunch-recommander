@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../lib/supabaseClient', () => ({
   supabase: {
@@ -92,6 +93,44 @@ describe('추천 실행', () => {
     // 외부 새 탭 이동 시 opener 노출을 막아야 한다.
     expect(link.rel).toContain('noopener');
     expect(link.target).toBe('_blank');
+  });
+
+  it('첫 조회 이후에는 같은 후보 풀에서 이미 추천한 음식점을 건너뜁니다', async () => {
+    const secondRestaurant = { ...restaurant, placeId: 'p2', name: '두 번째 식당' };
+    post.mockResolvedValue(mockNearby([restaurant, secondRestaurant]));
+    mockTables();
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    renderWithQuery(<Recommend location={location} canRate />);
+
+    fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: '식당' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: '두 번째 식당' })).toBeInTheDocument(),
+    );
+
+    expect(post).toHaveBeenCalledTimes(1);
+    random.mockRestore();
+  });
+
+  it('위치가 바뀌면 후보 풀과 중복 기록을 초기화합니다', async () => {
+    post.mockResolvedValue(mockNearby([restaurant]));
+    mockTables();
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const view = renderWithQuery(<Recommend location={location} canRate />);
+
+    fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: '식당' })).toBeInTheDocument());
+    view.rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <Recommend location={{ lat: 38, lng: 128, radius: 500 }} canRate />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: '식당' })).toBeInTheDocument());
+
+    expect(post).toHaveBeenCalledTimes(2);
+    random.mockRestore();
   });
 
   it('가격대가 있으면 카테고리·거리와 함께 ₩ 기호로 보여줍니다', async () => {

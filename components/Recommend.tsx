@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePlacePhoto, useRecommendationData } from '../lib/hooks/queries';
 import { googleMapsPlaceUrl, priceLevelSymbol } from '../lib/constants';
 import { errorMessage, MESSAGES } from '../lib/messages';
@@ -30,6 +30,12 @@ type Result = Candidate & {
   weight: number;
 };
 
+type RecommendationPool = {
+  candidates: Result[];
+  userId: string;
+  categoryWeights: Record<string, number>;
+};
+
 export default function Recommend({
   location,
   criteria = DEFAULT_RECOMMENDATION_CRITERIA,
@@ -44,33 +50,52 @@ export default function Recommend({
   const [userId, setUserId] = useState('');
   const [error, setError] = useState('');
   const [categoryWeights, setCategoryWeights] = useState<Record<string, number>>({});
+  const [recommendationPool, setRecommendationPool] = useState<RecommendationPool | null>(null);
+  const seenPlaceIds = useRef(new Set<string>());
   const { refetch, isFetching } = useRecommendationData(location);
   // 사진은 추천된 곳에 photoName이 있을 때만 조회된다(hook 안에서 enabled로 제어).
   const photo = usePlacePhoto(result?.photoName ?? null);
 
-  // 추첨은 누를 때마다 결과가 달라져야 하므로 캐시된 data를 그대로 쓰지 않고 매번 refetch한다.
+  useEffect(() => {
+    setRecommendationPool(null);
+    seenPlaceIds.current.clear();
+    setResult(null);
+    setError('');
+  }, [location?.lat, location?.lng, location?.radius]);
+
   async function run() {
     if (!location) return;
     setResult(null);
     setError('');
-    const { data, error: fetchError } = await refetch();
-    if (fetchError) return setError(errorMessage(fetchError));
-    if (!data) return setError(MESSAGES.NO_CANDIDATES);
+    let pool = recommendationPool;
+    if (!pool) {
+      const { data, error: fetchError } = await refetch();
+      if (fetchError) return setError(errorMessage(fetchError));
+      if (!data) return setError(MESSAGES.NO_CANDIDATES);
 
-    setUserId(data.userId);
-    const merged = mergeCandidates(data.restaurants, data.ratings, data.prefs, data.userId);
-    setCategoryWeights(merged.categoryWeights);
-    const candidates = filterCandidates(merged.candidates, new Date(), criteria).map(
-      (candidate) => ({
-        ...candidate,
-        weight: scoreCandidate(candidate, {
-          categoryWeights: merged.categoryWeights,
-          maxDistanceMeters: location.radius,
-        }),
-      }),
+      const merged = mergeCandidates(data.restaurants, data.ratings, data.prefs, data.userId);
+      pool = {
+        userId: data.userId,
+        categoryWeights: merged.categoryWeights,
+        candidates: filterCandidates(merged.candidates, new Date(), criteria).map((candidate) => ({
+          ...candidate,
+          weight: scoreCandidate(candidate, {
+            categoryWeights: merged.categoryWeights,
+            maxDistanceMeters: location.radius,
+          }),
+        })),
+      };
+      setRecommendationPool(pool);
+      setUserId(pool.userId);
+      setCategoryWeights(pool.categoryWeights);
+    }
+
+    const available = pool.candidates.filter(
+      (candidate) => !seenPlaceIds.current.has(candidate.placeId),
     );
-    const picked = pickWeightedRandom(candidates, Math.random);
+    const picked = pickWeightedRandom(available, Math.random);
     if (!picked) return setError(MESSAGES.NO_CANDIDATES);
+    seenPlaceIds.current.add(picked.placeId);
     setResult(picked);
   }
 
