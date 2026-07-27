@@ -22,9 +22,11 @@ function waitForMapsSdk(): Promise<typeof google.maps> {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
     const check = () => {
-      const maps = (globalThis as unknown as {
-        google?: { maps?: { importLibrary?: unknown } };
-      }).google?.maps;
+      const maps = (
+        globalThis as unknown as {
+          google?: { maps?: { importLibrary?: unknown } };
+        }
+      ).google?.maps;
       if (maps && typeof maps.importLibrary === 'function') {
         resolve(maps as typeof google.maps);
         return;
@@ -233,8 +235,25 @@ export default function Map({
       </div>
       <div className={styles.map} ref={node} aria-label="주변 지도" />
       <p className={styles.hint}>{MESSAGES.MAP_ADJUST_HINT}</p>
-      <button className={styles.refreshButton} type="button" onClick={refresh}>
-        지도 새로고침
+      <button
+        className={styles.refreshButton}
+        type="button"
+        onClick={refresh}
+        aria-label="지도 새로고침"
+        title="지도 새로고침"
+      >
+        <svg
+          className={styles.refreshIcon}
+          viewBox="0 0 24 24"
+          width="20"
+          height="20"
+          aria-hidden="true"
+        >
+          <path d="M20 11a8.1 8.1 0 0 0-14.9-3L3 11" />
+          <path d="M3 5v6h6" />
+          <path d="M4 13a8.1 8.1 0 0 0 14.9 3L21 13" />
+          <path d="M21 19v-6h-6" />
+        </svg>
       </button>
       {error && (
         <div className={styles.error} role="alert">
