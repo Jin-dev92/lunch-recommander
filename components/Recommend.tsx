@@ -49,6 +49,7 @@ export default function Recommend({
   const [result, setResult] = useState<Result | null>(null);
   const [userId, setUserId] = useState('');
   const [error, setError] = useState('');
+  const [poolExhausted, setPoolExhausted] = useState(false);
   const [categoryWeights, setCategoryWeights] = useState<Record<string, number>>({});
   const [recommendationPool, setRecommendationPool] = useState<RecommendationPool | null>(null);
   const seenPlaceIds = useRef(new Set<string>());
@@ -61,12 +62,20 @@ export default function Recommend({
     seenPlaceIds.current.clear();
     setResult(null);
     setError('');
-  }, [location?.lat, location?.lng, location?.radius]);
+    setPoolExhausted(false);
+  }, [
+    location?.lat,
+    location?.lng,
+    location?.radius,
+    criteria.minGoogleRating,
+    criteria.minGoogleReviews,
+  ]);
 
   async function run() {
     if (!location) return;
     setResult(null);
     setError('');
+    setPoolExhausted(false);
     let pool = recommendationPool;
     if (!pool) {
       const { data, error: fetchError } = await refetch();
@@ -94,7 +103,11 @@ export default function Recommend({
       (candidate) => !seenPlaceIds.current.has(candidate.placeId),
     );
     const picked = pickWeightedRandom(available, Math.random);
-    if (!picked) return setError(MESSAGES.NO_CANDIDATES);
+    if (!picked) {
+      if (pool.candidates.length > 0) setPoolExhausted(true);
+      else setError(MESSAGES.NO_CANDIDATES);
+      return;
+    }
     seenPlaceIds.current.add(picked.placeId);
     setResult(picked);
   }
@@ -173,6 +186,11 @@ export default function Recommend({
       {error && (
         <p className={styles.error} role="alert">
           {error}
+        </p>
+      )}
+      {poolExhausted && (
+        <p className={styles.notice} role="status">
+          {MESSAGES.RECOMMENDATION_POOL_EXHAUSTED}
         </p>
       )}
     </section>

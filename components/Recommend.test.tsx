@@ -113,6 +113,30 @@ describe('추천 실행', () => {
     random.mockRestore();
   });
 
+  it('후보를 모두 추천하면 검색 결과 고갈 안내를 보여줍니다', async () => {
+    const secondRestaurant = { ...restaurant, placeId: 'p2', name: '두 번째 식당' };
+    post.mockResolvedValue(mockNearby([restaurant, secondRestaurant]));
+    mockTables();
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    renderWithQuery(<Recommend location={location} canRate />);
+
+    const recommend = () => fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
+    recommend();
+    await waitFor(() => expect(screen.getByRole('heading', { name: '식당' })).toBeInTheDocument());
+    recommend();
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: '두 번째 식당' })).toBeInTheDocument(),
+    );
+    recommend();
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        '이번 검색에서 추천할 음식점을 모두 확인했어요. 위치나 검색 조건을 바꿔보세요.',
+      ),
+    );
+    random.mockRestore();
+  });
+
   it('위치가 바뀌면 후보 풀과 중복 기록을 초기화합니다', async () => {
     post.mockResolvedValue(mockNearby([restaurant]));
     mockTables();
@@ -322,7 +346,7 @@ describe('추천 실행', () => {
     );
   });
 
-  it('성공 후 재실행에서 후보가 없으면 이전 카드가 남지 않습니다', async () => {
+  it('후보 풀을 모두 소진하면 이전 카드가 남지 않고 고갈 안내를 보여줍니다', async () => {
     post.mockResolvedValueOnce(mockNearby([restaurant]));
     mockTables();
     renderWithQuery(<Recommend location={location} canRate />);
@@ -332,7 +356,9 @@ describe('추천 실행', () => {
     post.mockResolvedValueOnce(mockNearby([]));
     fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
     await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent('추천할 음식점이 없습니다.'),
+      expect(screen.getByRole('status')).toHaveTextContent(
+        '이번 검색에서 추천할 음식점을 모두 확인했어요. 위치나 검색 조건을 바꿔보세요.',
+      ),
     );
     expect(screen.queryByRole('heading', { name: '식당' })).not.toBeInTheDocument();
   });
