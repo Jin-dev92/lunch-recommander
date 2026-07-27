@@ -60,37 +60,37 @@
   line-height: 1.5;
 }
 
+.mapContainer {
+  position: relative;
+}
+
 .refreshButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  margin-top: 10px;
-  padding: 0;
-  color: var(--color-accent);
-  background: var(--color-surface);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-card);
-  cursor: pointer;
-  touch-action: manipulation;
+  position: absolute !important;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  color: var(--color-accent) !important;
+  background: var(--color-surface) !important;
+  box-shadow: var(--shadow-card);
 }
 
 .refreshButton:hover {
-  background: var(--color-accent-soft);
+  background: var(--color-accent-soft) !important;
 }
 
 .refreshButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
-.refreshIcon {
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
+.refreshButton svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* MUI의 기본 ripple이 지도 위에서 잘 보이도록 버튼의 색상만 프로젝트 토큰으로 맞춘다. */
+.refreshButton:active {
+  color: var(--color-accent);
 }
 
 .error {

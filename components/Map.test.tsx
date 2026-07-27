@@ -98,8 +98,8 @@ describe('지도', () => {
     render(<Map onLocationChange={vi.fn()} onRefresh={onRefresh} />);
 
     const refresh = screen.getByRole('button', { name: '지도 새로고침' });
-    expect(refresh).toHaveAttribute('title', '지도 새로고침');
     expect(refresh.querySelector('svg')).toBeInTheDocument();
+    expect(screen.getByLabelText('주변 지도').parentElement).toContainElement(refresh);
     fireEvent.click(refresh);
 
     expect(onRefresh).toHaveBeenCalledOnce();
