@@ -27,9 +27,11 @@ const MAPS_SCRIPT_SRC =
 export default function Map({
   onLocationChange,
   onCriteriaChange,
+  onRefresh,
 }: {
   onLocationChange: (value: SearchLocation) => void;
   onCriteriaChange?: (value: RecommendationCriteria) => void;
+  onRefresh?: () => void;
 }) {
   const node = useRef<HTMLDivElement>(null);
   // 지도 인스턴스는 최초 1회만 만든다. 이 ref가 "이미 생성됨" 표시 역할도 한다.
@@ -46,6 +48,7 @@ export default function Map({
   const [coords, setCoords] = useState<Coords | null>(null);
   const [error, setError] = useState('');
   const [isLocating, setIsLocating] = useState(false);
+  const refresh = onRefresh ?? (() => window.location.reload());
 
   const requestLocation = useCallback(async (isRetry = false) => {
     setIsLocating(true);
@@ -201,24 +204,32 @@ export default function Map({
       </div>
       <div className={styles.map} ref={node} aria-label="주변 지도" />
       <p className={styles.hint}>{MESSAGES.MAP_ADJUST_HINT}</p>
+      <button className={styles.refreshButton} type="button" onClick={refresh}>
+        지도 새로고침
+      </button>
       {error && (
         <div className={styles.error} role="alert">
-          <button
-            className={styles.retryButton}
-            type="button"
-            disabled={isLocating}
-            aria-busy={isLocating}
-            onClick={() => requestLocation(true)}
-          >
-            {isLocating ? (
-              <>
-                <Spinner />
-                위치 확인 중…
-              </>
-            ) : (
-              error
-            )}
-          </button>
+          {error === MESSAGES.GEOLOCATION_DENIED ||
+          error === MESSAGES.GEOLOCATION_SETTINGS_REQUIRED ? (
+            <button
+              className={styles.retryButton}
+              type="button"
+              disabled={isLocating}
+              aria-busy={isLocating}
+              onClick={() => requestLocation(true)}
+            >
+              {isLocating ? (
+                <>
+                  <Spinner />
+                  위치 확인 중…
+                </>
+              ) : (
+                error
+              )}
+            </button>
+          ) : (
+            <p>{error}</p>
+          )}
         </div>
       )}
     </section>

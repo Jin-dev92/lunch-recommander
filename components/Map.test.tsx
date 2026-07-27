@@ -87,6 +87,19 @@ describe('지도', () => {
     );
   });
 
+  it('지도 새로고침 버튼을 누르면 새로고침 콜백을 호출합니다', () => {
+    vi.stubGlobal('navigator', {
+      geolocation: { getCurrentPosition: vi.fn() },
+    });
+    const onRefresh = vi.fn();
+
+    render(<Map onLocationChange={vi.fn()} onRefresh={onRefresh} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '지도 새로고침' }));
+
+    expect(onRefresh).toHaveBeenCalledOnce();
+  });
+
   it('검색 반경과 추천 품질 조건을 제공합니다', () => {
     vi.stubGlobal('navigator', {
       geolocation: { getCurrentPosition: vi.fn() },
