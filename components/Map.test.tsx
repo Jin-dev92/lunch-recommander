@@ -9,15 +9,17 @@ vi.mock('next/script', () => ({
   // 훅을 쓰는 컴포넌트이므로 이름이 대문자로 시작해야 rules-of-hooks를 통과한다.
   default: function MockScript({
     onReady,
+    onLoad,
     onError,
   }: {
     onReady?: () => void;
+    onLoad?: () => void;
     onError?: () => void;
   }) {
     useEffect(() => {
       if (scriptShouldFail) onError?.();
       else onReady?.();
-    }, [onReady, onError]);
+    }, [onReady, onError, onLoad]);
     return null;
   },
 }));
@@ -85,6 +87,35 @@ describe('지도', () => {
         visible: false,
       }),
     );
+  });
+
+  it('지도 새로고침 버튼을 누르면 새로고침 콜백을 호출합니다', () => {
+    vi.stubGlobal('navigator', {
+      geolocation: { getCurrentPosition: vi.fn() },
+    });
+    const onRefresh = vi.fn();
+
+    render(<Map onLocationChange={vi.fn()} onRefresh={onRefresh} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '지도 새로고침' }));
+
+    expect(onRefresh).toHaveBeenCalledOnce();
+  });
+
+  it('스크립트 준비 직후 Google Maps 라이브러리가 늦게 노출돼도 지도를 만듭니다', async () => {
+    const maps = (globalThis as unknown as { google: typeof google }).google.maps;
+    const importLibrary = maps.importLibrary;
+    Object.defineProperty(maps, 'importLibrary', { value: undefined, configurable: true });
+    window.setTimeout(() => {
+      Object.defineProperty(maps, 'importLibrary', { value: importLibrary, configurable: true });
+    }, 10);
+    vi.stubGlobal('navigator', {
+      geolocation: { getCurrentPosition: vi.fn() },
+    });
+
+    render(<Map onLocationChange={vi.fn()} />);
+
+    await waitFor(() => expect(mapMock).toHaveBeenCalledTimes(1));
   });
 
   it('검색 반경과 추천 품질 조건을 제공합니다', () => {

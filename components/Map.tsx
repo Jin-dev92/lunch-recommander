@@ -15,6 +15,29 @@ import Spinner from './Spinner';
 
 type Coords = { lat: number; lng: number };
 const DEFAULT_MAP_CENTER: Coords = { lat: 37.5665, lng: 126.978 };
+const MAPS_SDK_POLL_INTERVAL_MS = 50;
+const MAPS_SDK_TIMEOUT_MS = 5000;
+
+function waitForMapsSdk(): Promise<typeof google.maps> {
+  return new Promise((resolve, reject) => {
+    const startedAt = Date.now();
+    const check = () => {
+      const maps = (globalThis as unknown as {
+        google?: { maps?: { importLibrary?: unknown } };
+      }).google?.maps;
+      if (maps && typeof maps.importLibrary === 'function') {
+        resolve(maps as typeof google.maps);
+        return;
+      }
+      if (Date.now() - startedAt >= MAPS_SDK_TIMEOUT_MS) {
+        reject(new Error('Google Maps SDK 준비 시간이 초과되었습니다.'));
+        return;
+      }
+      window.setTimeout(check, MAPS_SDK_POLL_INTERVAL_MS);
+    };
+    check();
+  });
+}
 
 // loading=async는 Google이 권장하는 로딩 방식이다(생략하면 콘솔 경고가 뜬다). 대신 스크립트가
 // 비동기로 들어오므로 google 전역이 언제 준비되는지 알 수 없어, onReady + importLibrary로 기다린다.
@@ -27,9 +50,11 @@ const MAPS_SCRIPT_SRC =
 export default function Map({
   onLocationChange,
   onCriteriaChange,
+  onRefresh,
 }: {
   onLocationChange: (value: SearchLocation) => void;
   onCriteriaChange?: (value: RecommendationCriteria) => void;
+  onRefresh?: () => void;
 }) {
   const node = useRef<HTMLDivElement>(null);
   // 지도 인스턴스는 최초 1회만 만든다. 이 ref가 "이미 생성됨" 표시 역할도 한다.
@@ -46,6 +71,8 @@ export default function Map({
   const [coords, setCoords] = useState<Coords | null>(null);
   const [error, setError] = useState('');
   const [isLocating, setIsLocating] = useState(false);
+  const refresh = onRefresh ?? (() => window.location.reload());
+  const markSdkReady = useCallback(() => setSdkReady(true), []);
 
   const requestLocation = useCallback(async (isRetry = false) => {
     setIsLocating(true);
@@ -94,11 +121,13 @@ export default function Map({
     let cancelled = false;
 
     (async () => {
-      // loading=async는 요청한 라이브러리만 로드한다. Marker는 maps가 아니라 marker
-      // 라이브러리 소속이므로 함께 가져오지 않으면 google.maps.Marker가 undefined다.
+      // loading=async는 스크립트 태그의 준비 이벤트와 importLibrary 노출 시점이
+      // 다를 수 있으므로, SDK 전역이 실제로 준비될 때까지 기다린다.
+      const maps = await waitForMapsSdk();
+      // Marker는 maps가 아니라 marker 라이브러리 소속이므로 함께 요청한다.
       const [{ Map: GoogleMap }, { Marker }] = await Promise.all([
-        google.maps.importLibrary('maps') as Promise<google.maps.MapsLibrary>,
-        google.maps.importLibrary('marker') as Promise<google.maps.MarkerLibrary>,
+        maps.importLibrary('maps') as Promise<google.maps.MapsLibrary>,
+        maps.importLibrary('marker') as Promise<google.maps.MarkerLibrary>,
       ]);
       // 라이브러리를 기다리는 사이 언마운트됐거나 다른 경로로 이미 만들어졌으면 중단한다.
       if (cancelled || mapRef.current || !node.current) return;
@@ -126,7 +155,9 @@ export default function Map({
       map.addListener('click', (event: google.maps.MapMouseEvent) => moveTo(event.latLng));
       mapRef.current = map;
       markerRef.current = marker;
-    })().catch(() => setError(MESSAGES.MAP_LOAD_FAILED));
+    })().catch(() => {
+      if (!cancelled) setError(MESSAGES.MAP_LOAD_FAILED);
+    });
 
     return () => {
       cancelled = true;
@@ -146,7 +177,8 @@ export default function Map({
       <Script
         src={MAPS_SCRIPT_SRC}
         strategy="afterInteractive"
-        onReady={() => setSdkReady(true)}
+        onLoad={markSdkReady}
+        onReady={markSdkReady}
         onError={() => setError(MESSAGES.MAP_LOAD_FAILED)}
       />
       <div className={styles.searchFields}>
@@ -201,24 +233,32 @@ export default function Map({
       </div>
       <div className={styles.map} ref={node} aria-label="주변 지도" />
       <p className={styles.hint}>{MESSAGES.MAP_ADJUST_HINT}</p>
+      <button className={styles.refreshButton} type="button" onClick={refresh}>
+        지도 새로고침
+      </button>
       {error && (
         <div className={styles.error} role="alert">
-          <button
-            className={styles.retryButton}
-            type="button"
-            disabled={isLocating}
-            aria-busy={isLocating}
-            onClick={() => requestLocation(true)}
-          >
-            {isLocating ? (
-              <>
-                <Spinner />
-                위치 확인 중…
-              </>
-            ) : (
-              error
-            )}
-          </button>
+          {error === MESSAGES.GEOLOCATION_DENIED ||
+          error === MESSAGES.GEOLOCATION_SETTINGS_REQUIRED ? (
+            <button
+              className={styles.retryButton}
+              type="button"
+              disabled={isLocating}
+              aria-busy={isLocating}
+              onClick={() => requestLocation(true)}
+            >
+              {isLocating ? (
+                <>
+                  <Spinner />
+                  위치 확인 중…
+                </>
+              ) : (
+                error
+              )}
+            </button>
+          ) : (
+            <p>{error}</p>
+          )}
         </div>
       )}
     </section>

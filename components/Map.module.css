@@ -60,6 +60,30 @@
   line-height: 1.5;
 }
 
+.refreshButton {
+  min-height: 40px;
+  margin-top: 10px;
+  padding: 0 14px;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.refreshButton:hover {
+  background: var(--color-accent-soft);
+}
+
+.refreshButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
+}
+
 .error {
   margin: 12px 0 0;
   padding: 10px 14px;

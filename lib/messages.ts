@@ -3,6 +3,8 @@ export const MESSAGES = {
   APP_NAME: '오늘 뭐먹지',
   LOGIN_REQUIRED: '로그인이 필요합니다.',
   NO_CANDIDATES: '추천할 음식점이 없습니다.',
+  RECOMMENDATION_POOL_EXHAUSTED:
+    '이번 검색에서 추천할 음식점을 모두 확인했어요. 위치나 검색 조건을 바꿔보세요.',
   RATING_SAVE_FAILED: '평점 저장에 실패했습니다.',
   SNOOZE_FAILED: '스누즈 처리에 실패했습니다.',
   CATEGORY_PREF_SAVE_FAILED: '기호 저장에 실패했습니다.',
