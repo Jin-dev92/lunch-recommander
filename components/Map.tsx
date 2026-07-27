@@ -2,6 +2,9 @@
 
 import Script from 'next/script';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import {
   DEFAULT_RECOMMENDATION_CRITERIA,
   type MinimumGoogleRating,
@@ -233,28 +236,20 @@ export default function Map({
           </select>
         </label>
       </div>
-      <div className={styles.map} ref={node} aria-label="주변 지도" />
+      <div className={styles.mapContainer}>
+        <div className={styles.map} ref={node} aria-label="주변 지도" />
+        <Tooltip title="지도 새로고침" placement="top">
+          <IconButton
+            className={styles.refreshButton}
+            onClick={refresh}
+            aria-label="지도 새로고침"
+            size="large"
+          >
+            <RefreshRoundedIcon />
+          </IconButton>
+        </Tooltip>
+      </div>
       <p className={styles.hint}>{MESSAGES.MAP_ADJUST_HINT}</p>
-      <button
-        className={styles.refreshButton}
-        type="button"
-        onClick={refresh}
-        aria-label="지도 새로고침"
-        title="지도 새로고침"
-      >
-        <svg
-          className={styles.refreshIcon}
-          viewBox="0 0 24 24"
-          width="20"
-          height="20"
-          aria-hidden="true"
-        >
-          <path d="M20 11a8.1 8.1 0 0 0-14.9-3L3 11" />
-          <path d="M3 5v6h6" />
-          <path d="M4 13a8.1 8.1 0 0 0 14.9 3L21 13" />
-          <path d="M21 19v-6h-6" />
-        </svg>
-      </button>
       {error && (
         <div className={styles.error} role="alert">
           {error === MESSAGES.GEOLOCATION_DENIED ||
