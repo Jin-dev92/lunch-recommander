@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { usePlacePhoto, useRecommendationData } from '../lib/hooks/queries';
-import { googleMapsPlaceUrl, priceLevelSymbol } from '../lib/constants';
+import { displayAddress, googleMapsPlaceUrl, priceLevelSymbol } from '../lib/constants';
 import { errorMessage, MESSAGES } from '../lib/messages';
 import { mergeCandidates } from '../lib/mergeCandidates';
 import {
@@ -150,7 +150,7 @@ export default function Recommend({
               .filter(Boolean)
               .join(' · ')}
           </p>
-          {result.address && <p className={styles.address}>{result.address}</p>}
+          {result.address && <p className={styles.address}>{displayAddress(result.address)}</p>}
           {/* 메뉴·사진·리뷰는 Google 지도 상세로 넘긴다. placeId만 쓰므로 추가 API 비용이 없다. */}
           <a
             className={styles.detailLink}

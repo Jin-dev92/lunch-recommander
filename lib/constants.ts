@@ -25,6 +25,21 @@ export function priceLevelSymbol(priceLevel: string | null): string {
 }
 
 /**
+ * 화면 표시용 주소. Google formattedAddress는 국가를 넣는데, 한국·일본 등 CJK 로케일은 국가를
+ * 맨 앞 한 어절로("대한민국 서울…"), 서구권은 맨 뒤에 쉼표로("…, USA") 붙인다.
+ * 앞에 오는 국가명만 떼어 장황함을 줄인다. 저장값(DB)은 전체 주소를 그대로 두고 표시할 때만 다듬는다.
+ *   - 쉼표가 있으면 서구식으로 보고 그대로 둔다(국가가 맨 뒤라 앞을 떼면 안 된다).
+ *   - 쉼표가 없으면 CJK식이라 국가가 맨 앞이다. 짧은 첫 어절(≤4자)만 국가명으로 보고 뗀다.
+ *     "대한민국"(4자)은 떼고 "서울특별시"(5자) 같은 지명은 보존하기 위한 경계다.
+ */
+export function displayAddress(address: string | null): string {
+  const value = (address ?? '').trim();
+  if (value.includes(',')) return value;
+  const parts = value.split(/\s+/);
+  return parts.length > 1 && parts[0].length <= 4 ? parts.slice(1).join(' ') : value;
+}
+
+/**
  * Google 지도의 해당 가게 상세 페이지 URL. 메뉴·사진·리뷰·영업시간을 여기서 볼 수 있다.
  * placeId만 쓰므로 추가 API 호출·비용이 없다. query는 필수라 이름을 함께 넣는다.
  * @see https://developers.google.com/maps/documentation/urls/get-started#search-action

@@ -25,7 +25,7 @@ const restaurant = {
   name: '식당',
   category: 'korean_restaurant',
   categoryLabel: '한식',
-  address: '서울 성북구 테스트로 1',
+  address: '대한민국 서울특별시 성북구 테스트로 1',
   lat: 37,
   lng: 127,
   googleRating: 4,
@@ -158,12 +158,15 @@ describe('추천 실행', () => {
     random.mockRestore();
   });
 
-  it('추천 결과에 주소를 보여줍니다', async () => {
+  it('추천 결과에 국가명을 뗀 주소를 보여줍니다', async () => {
     post.mockResolvedValue(mockNearby([restaurant]));
     mockTables();
     renderWithQuery(<Recommend location={location} canRate />);
     fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
-    await waitFor(() => expect(screen.getByText('서울 성북구 테스트로 1')).toBeInTheDocument());
+    // '대한민국 '을 뗀 형태로 표시한다.
+    await waitFor(() =>
+      expect(screen.getByText('서울특별시 성북구 테스트로 1')).toBeInTheDocument(),
+    );
   });
 
   it('주소가 없으면 주소 줄을 그리지 않습니다', async () => {
@@ -172,7 +175,7 @@ describe('추천 실행', () => {
     renderWithQuery(<Recommend location={location} canRate />);
     fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: '식당' })).toBeInTheDocument());
-    expect(screen.queryByText('서울 성북구 테스트로 1')).not.toBeInTheDocument();
+    expect(screen.queryByText(/성북구 테스트로 1/)).not.toBeInTheDocument();
   });
 
   it('가격대가 있으면 카테고리·거리와 함께 ₩ 기호로 보여줍니다', async () => {
