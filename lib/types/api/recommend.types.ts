@@ -23,6 +23,8 @@ export type NearbyRestaurant = {
   category: string;
   /** Google primaryTypeDisplayName(한식당 등). 화면 표시 전용이며 저장 키로 쓰지 않는다. */
   categoryLabel: string;
+  /** Google formattedAddress. 사람이 읽는 주소이며 좌표만으로 위치를 알기 어려워 함께 보관한다. */
+  address: string | null;
   lat: number;
   lng: number;
   googleRating: number | null;
