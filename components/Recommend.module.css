@@ -116,6 +116,14 @@
   box-shadow: 0 0 0 3px var(--color-accent-soft);
 }
 
+.address {
+  margin: -6px 0 14px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .loginPrompt {
   margin: 8px 0 0;
   padding: 14px;

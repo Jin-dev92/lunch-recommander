@@ -9,6 +9,8 @@ export type NearbyRestaurant = {
   // 점수 계산 기준이므로 표기가 바뀌지 않는 값을 쓴다. 화면에는 categoryLabel을 보여준다.
   category: string;
   categoryLabel: string;
+  // 사람이 읽는 주소(formattedAddress). 좌표만으로 위치를 알기 어려워 함께 보관한다.
+  address: string | null;
   lat: number;
   lng: number;
   googleRating: number | null;
@@ -103,10 +105,10 @@ export function createGoogleFetcher(googlePlacesApiKey: string): NearbyDeps['fet
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': googlePlacesApiKey,
-        // rating이 이미 Enterprise 등급을 부르므로 priceLevel·photos는 등급을 더 올리지 않는다.
-        // 사진은 여기서 이름만 받고(무료), 실제 이미지 해석은 추천된 1곳만 place-photo가 한다.
+        // rating이 이미 Enterprise 등급을 부르므로 priceLevel·photos·formattedAddress(Pro)는 등급을
+        // 더 올리지 않는다. 사진은 여기서 이름만 받고(무료), 실제 이미지 해석은 추천된 1곳만 처리한다.
         'X-Goog-FieldMask':
-          'places.id,places.displayName,places.primaryType,places.primaryTypeDisplayName,places.location,places.rating,places.userRatingCount,places.priceLevel,places.photos',
+          'places.id,places.displayName,places.primaryType,places.primaryTypeDisplayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.photos',
       },
       body: JSON.stringify({
         // languageCode가 없으면 displayName과 primaryTypeDisplayName이 영문으로 온다.
@@ -131,6 +133,7 @@ export function createGoogleFetcher(googlePlacesApiKey: string): NearbyDeps['fet
       placeId: place.id,
       name: place.displayName?.text ?? '',
       category: place.primaryType ?? 'restaurant',
+      address: place.formattedAddress ?? null,
       categoryLabel: place.primaryTypeDisplayName?.text ?? '기타',
       lat: place.location?.latitude,
       lng: place.location?.longitude,
@@ -168,7 +171,7 @@ if (import.meta.main) {
       const { data, error } = await supabase
         .from('restaurants')
         .select(
-          'place_id,name,category,category_label,lat,lng,google_rating,google_ratings_total,price_level,photo_name,fetched_at',
+          'place_id,name,category,category_label,address,lat,lng,google_rating,google_ratings_total,price_level,photo_name,fetched_at',
         )
         .gte('fetched_at', cutoff);
       if (error) throw error;
@@ -179,6 +182,7 @@ if (import.meta.main) {
           category: row.category,
           // 라벨을 모르는 구버전 캐시 행은 기계값을 그대로 보여준다(15분 뒤 새 값으로 대체된다).
           categoryLabel: row.category_label ?? row.category,
+          address: row.address ?? null,
           lat: row.lat,
           lng: row.lng,
           googleRating: row.google_rating,
@@ -198,6 +202,7 @@ if (import.meta.main) {
           name: row.name,
           category: row.category,
           category_label: row.categoryLabel,
+          address: row.address,
           lat: row.lat,
           lng: row.lng,
           google_rating: row.googleRating,

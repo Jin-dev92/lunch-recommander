@@ -25,6 +25,7 @@ import styles from './Recommend.module.css';
 type Result = Candidate & {
   name: string;
   categoryLabel: string;
+  address: string | null;
   priceLevel: string | null;
   photoName: string | null;
   weight: number;
@@ -149,6 +150,7 @@ export default function Recommend({
               .filter(Boolean)
               .join(' · ')}
           </p>
+          {result.address && <p className={styles.address}>{result.address}</p>}
           {/* 메뉴·사진·리뷰는 Google 지도 상세로 넘긴다. placeId만 쓰므로 추가 API 비용이 없다. */}
           <a
             className={styles.detailLink}

@@ -10,6 +10,7 @@ export function mergeCandidates(
   candidates: (Candidate & {
     name: string;
     categoryLabel: string;
+    address: string | null;
     priceLevel: string | null;
     photoName: string | null;
   })[];
