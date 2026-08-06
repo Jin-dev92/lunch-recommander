@@ -13,6 +13,7 @@ export const MESSAGES = {
   GEOLOCATION_SETTINGS_REQUIRED: '브라우저 설정에서 위치 권한을 허용해 주세요.',
   MAP_LOAD_FAILED: '지도를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
   MAP_ADJUST_HINT: '위치가 실제와 다르면 지도를 누르거나 핀을 끌어 옮기세요.',
+  ADDRESS_SEARCH_PLACEHOLDER: '주소·장소로 검색 (예: 성북동 1가)',
   GROUP_CREATE_FAILED: '그룹 생성에 실패했습니다.',
   GROUP_JOINED: '그룹에 가입했습니다.',
   ALREADY_LOGGED_IN: '이미 로그인되어 있습니다.',

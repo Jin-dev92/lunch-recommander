@@ -46,6 +46,10 @@ export type PlacePhotoResponse = {
   photoUri: string;
 };
 
+/** @see POST /functions/v1/geocode */
+export type GeocodeRequest = { address: string };
+export type GeocodeResponse = { lat: number; lng: number };
+
 /** 추천 한 번에 필요한 원본 데이터 묶음. 점수 계산·추첨은 lib/recommend.ts가 담당한다. */
 export type RecommendationData = {
   userId: string;

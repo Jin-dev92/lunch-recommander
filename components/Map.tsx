@@ -13,6 +13,8 @@ import {
   type SearchLocation,
 } from '../lib/types/api';
 import { MESSAGES } from '../lib/messages';
+import { useGeocode } from '../lib/hooks/mutations';
+import { errorMessage } from '../lib/messages';
 import styles from './Map.module.css';
 import Spinner from './Spinner';
 
@@ -78,6 +80,20 @@ export default function Map({
   const [isLocating, setIsLocating] = useState(false);
   const refresh = onRefresh ?? (() => window.location.reload());
   const markSdkReady = useCallback(() => setSdkReady(true), []);
+  const geocode = useGeocode();
+
+  // 주소 검색: 좌표로 변환되면 setCoords가 지도 중심·핀·검색 위치를 함께 옮긴다.
+  function searchAddress(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const address = String(new FormData(event.currentTarget).get('address') ?? '').trim();
+    if (!address) return;
+    geocode.mutate(address, {
+      onSuccess: (coords) => {
+        setError('');
+        setCoords(coords);
+      },
+    });
+  }
 
   const requestLocation = useCallback(async (isRetry = false) => {
     setIsLocating(true);
@@ -187,6 +203,31 @@ export default function Map({
         onReady={markSdkReady}
         onError={() => setError(MESSAGES.MAP_LOAD_FAILED)}
       />
+      <form className={styles.addressSearch} onSubmit={searchAddress}>
+        <input
+          className={styles.addressInput}
+          type="search"
+          name="address"
+          aria-label="주소 검색"
+          placeholder={MESSAGES.ADDRESS_SEARCH_PLACEHOLDER}
+          maxLength={200}
+        />
+        <button className={styles.addressButton} type="submit" disabled={geocode.isPending}>
+          {geocode.isPending ? (
+            <>
+              <Spinner />
+              검색 중…
+            </>
+          ) : (
+            '검색'
+          )}
+        </button>
+      </form>
+      {geocode.isError && (
+        <p className={styles.addressError} role="alert">
+          {errorMessage(geocode.error)}
+        </p>
+      )}
       <div className={styles.searchFields}>
         <label className={styles.searchField}>
           검색 반경
