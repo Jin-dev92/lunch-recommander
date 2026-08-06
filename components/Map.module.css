@@ -6,6 +6,68 @@
   box-shadow: var(--shadow-card);
 }
 
+.addressSearch {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.addressInput {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  color: var(--color-text);
+  font-size: 15px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  transition:
+    border-color 180ms,
+    box-shadow 180ms;
+}
+
+.addressInput:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
+}
+
+.addressButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 18px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--color-accent);
+  border: none;
+  border-radius: var(--radius-card);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background 180ms,
+    opacity 180ms;
+}
+
+.addressButton:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.addressButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.addressError {
+  margin: -4px 0 12px;
+  color: var(--color-error-text);
+  font-size: 13px;
+}
+
 .searchFields {
   display: grid;
   gap: 10px;

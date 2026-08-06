@@ -4,6 +4,7 @@ import { MESSAGES } from '../messages';
 import { supabase } from '../supabaseClient';
 import type {
   CategoryPrefRow,
+  GeocodeResponse,
   NearbyResponse,
   PlacePhotoResponse,
   RatingRow,
@@ -55,4 +56,10 @@ export async function getPlacePhotoUri(photoName: string): Promise<string> {
     photoName,
   });
   return data.photoUri;
+}
+
+/** 주소 문자열을 좌표로 변환한다. 지오코딩은 과금 대상이라 사용자가 검색할 때만 호출된다. */
+export async function geocodeAddress(address: string): Promise<GeocodeResponse> {
+  const { data } = await axiosInstance.post<GeocodeResponse>(API_ROUTES.GEOCODE, { address });
+  return data;
 }

@@ -1,6 +1,21 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { useEffect } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// 주소 검색은 useGeocode → axiosInstance → supabaseClient를 탄다. 네트워크·QueryClient를 모킹한다.
+vi.mock('../lib/supabaseClient', () => ({
+  supabase: { auth: { getSession: vi.fn().mockResolvedValue({ data: { session: null } }) } },
+}));
+vi.mock('../lib/axiosInstance', () => ({ axiosInstance: { post: vi.fn() } }));
+import { axiosInstance } from '../lib/axiosInstance';
+const geocodePost = axiosInstance.post as ReturnType<typeof vi.fn>;
+
+// useGeocode(mutation)가 QueryClientProvider를 요구하므로 렌더를 감싼다.
+function renderMap(ui: ReactElement) {
+  const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
 
 // next/script는 jsdom에서 실제로 스크립트를 받아오지 않는다. SDK 로드 완료 신호만 재현한다.
 // onReady를 effect에서 호출해야 렌더 중 setState 경고가 나지 않는다.
@@ -42,6 +57,7 @@ function latLng(lat: number, lng: number) {
 
 beforeEach(() => {
   scriptShouldFail = false;
+  geocodePost.mockReset();
   listeners = {};
   setPosition.mockReset();
   setVisible.mockReset();
@@ -74,7 +90,7 @@ describe('지도', () => {
       geolocation: { getCurrentPosition: vi.fn() },
     });
 
-    render(<Map onLocationChange={vi.fn()} />);
+    renderMap(<Map onLocationChange={vi.fn()} />);
 
     await waitFor(() =>
       expect(mapMock).toHaveBeenCalledWith(expect.anything(), {
@@ -90,13 +106,48 @@ describe('지도', () => {
     );
   });
 
+  it('주소를 검색하면 지오코딩 좌표로 위치를 옮깁니다', async () => {
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: vi.fn() } });
+    geocodePost.mockResolvedValue({ data: { lat: 37.6, lng: 127.05 } });
+    const onLocationChange = vi.fn();
+    renderMap(<Map onLocationChange={onLocationChange} />);
+
+    fireEvent.change(screen.getByLabelText('주소 검색'), { target: { value: '성북동 1가' } });
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+
+    await waitFor(() =>
+      expect(onLocationChange).toHaveBeenCalledWith({ lat: 37.6, lng: 127.05, radius: 500 }),
+    );
+    expect(geocodePost).toHaveBeenCalledWith('/geocode', { address: '성북동 1가' });
+  });
+
+  it('주소 검색에 실패하면 서버가 준 문구를 보여줍니다', async () => {
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: vi.fn() } });
+    geocodePost.mockRejectedValue(new Error('주소를 찾을 수 없습니다.'));
+    renderMap(<Map onLocationChange={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText('주소 검색'), { target: { value: '없는주소zzz' } });
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('주소를 찾을 수 없습니다.'),
+    );
+  });
+
+  it('빈 주소로는 지오코딩을 호출하지 않습니다', () => {
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: vi.fn() } });
+    renderMap(<Map onLocationChange={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '검색' }));
+    expect(geocodePost).not.toHaveBeenCalled();
+  });
+
   it('지도 새로고침 버튼을 누르면 새로고침 콜백을 호출합니다', () => {
     vi.stubGlobal('navigator', {
       geolocation: { getCurrentPosition: vi.fn() },
     });
     const onRefresh = vi.fn();
 
-    render(<Map onLocationChange={vi.fn()} onRefresh={onRefresh} />);
+    renderMap(<Map onLocationChange={vi.fn()} onRefresh={onRefresh} />);
 
     const refresh = screen.getByRole('button', { name: '지도 새로고침' });
     expect(refresh.querySelector('svg')).toBeInTheDocument();
@@ -117,7 +168,7 @@ describe('지도', () => {
       geolocation: { getCurrentPosition: vi.fn() },
     });
 
-    render(<Map onLocationChange={vi.fn()} />);
+    renderMap(<Map onLocationChange={vi.fn()} />);
 
     await waitFor(() => expect(mapMock).toHaveBeenCalledTimes(1));
   });
@@ -126,7 +177,7 @@ describe('지도', () => {
     vi.stubGlobal('navigator', {
       geolocation: { getCurrentPosition: vi.fn() },
     });
-    render(<Map onLocationChange={vi.fn()} onCriteriaChange={vi.fn()} />);
+    renderMap(<Map onLocationChange={vi.fn()} onCriteriaChange={vi.fn()} />);
     expect(screen.getByRole('option', { name: '100m' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '300m' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '500m' })).toBeInTheDocument();
@@ -143,7 +194,7 @@ describe('지도', () => {
       geolocation: { getCurrentPosition: vi.fn() },
     });
     const onCriteriaChange = vi.fn();
-    render(<Map onLocationChange={vi.fn()} onCriteriaChange={onCriteriaChange} />);
+    renderMap(<Map onLocationChange={vi.fn()} onCriteriaChange={onCriteriaChange} />);
 
     fireEvent.change(screen.getByLabelText('최소 평점'), { target: { value: '4.5' } });
     expect(onCriteriaChange).toHaveBeenLastCalledWith({
@@ -164,7 +215,7 @@ describe('지도', () => {
     );
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
     const onLocationChange = vi.fn();
-    render(<Map onLocationChange={onLocationChange} />);
+    renderMap(<Map onLocationChange={onLocationChange} />);
     await waitFor(() =>
       expect(onLocationChange).toHaveBeenCalledWith({
         lat: 37.5,
@@ -193,7 +244,7 @@ describe('지도', () => {
       success({ coords: { latitude: 37.5, longitude: 127.0 } } as GeolocationPosition),
     );
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
-    render(<Map onLocationChange={vi.fn()} />);
+    renderMap(<Map onLocationChange={vi.fn()} />);
     await waitFor(() => expect(getCurrentPosition).toHaveBeenCalled());
     expect(getCurrentPosition.mock.calls[0][2]).toMatchObject({
       enableHighAccuracy: true,
@@ -207,7 +258,7 @@ describe('지도', () => {
     );
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
     const onLocationChange = vi.fn();
-    render(<Map onLocationChange={onLocationChange} />);
+    renderMap(<Map onLocationChange={onLocationChange} />);
     await waitFor(() => expect(markerMock).toHaveBeenCalled());
 
     listeners.dragend({ latLng: latLng(37.6, 127.1) });
@@ -225,7 +276,7 @@ describe('지도', () => {
     );
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
     const onLocationChange = vi.fn();
-    render(<Map onLocationChange={onLocationChange} />);
+    renderMap(<Map onLocationChange={onLocationChange} />);
     await waitFor(() => expect(mapMock).toHaveBeenCalled());
 
     listeners.click({ latLng: latLng(37.4, 126.9) });
@@ -242,7 +293,7 @@ describe('지도', () => {
       success({ coords: { latitude: 37.5, longitude: 127.0 } }),
     );
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
-    render(<Map onLocationChange={vi.fn()} />);
+    renderMap(<Map onLocationChange={vi.fn()} />);
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('지도를 불러오지 못했습니다'),
     );
@@ -263,7 +314,7 @@ describe('지도', () => {
       success({ coords: { latitude: 37.5, longitude: 127.0 } }),
     );
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
-    render(<Map onLocationChange={vi.fn()} />);
+    renderMap(<Map onLocationChange={vi.fn()} />);
 
     expect(mapMock).not.toHaveBeenCalled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -282,7 +333,7 @@ describe('지도', () => {
       );
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
     const onLocationChange = vi.fn();
-    render(<Map onLocationChange={onLocationChange} />);
+    renderMap(<Map onLocationChange={onLocationChange} />);
     const retry = await screen.findByRole('button', {
       name: '현재 위치 권한이 필요합니다.',
     });
@@ -307,7 +358,7 @@ describe('지도', () => {
       geolocation: { getCurrentPosition },
       permissions: { query },
     });
-    render(<Map onLocationChange={vi.fn()} />);
+    renderMap(<Map onLocationChange={vi.fn()} />);
     const retry = await screen.findByRole('button', {
       name: '현재 위치 권한이 필요합니다.',
     });
@@ -330,7 +381,7 @@ describe('지도', () => {
         retrySuccess = success;
       });
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
-    render(<Map onLocationChange={vi.fn()} />);
+    renderMap(<Map onLocationChange={vi.fn()} />);
     const retry = await screen.findByRole('button', {
       name: '현재 위치 권한이 필요합니다.',
     });
@@ -355,7 +406,7 @@ describe('지도', () => {
     );
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
     const onLocationChange = vi.fn();
-    render(<Map onLocationChange={onLocationChange} />);
+    renderMap(<Map onLocationChange={onLocationChange} />);
     await waitFor(() =>
       expect(onLocationChange).toHaveBeenCalledWith({
         lat: 37.5,
