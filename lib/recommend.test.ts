@@ -8,7 +8,6 @@ const base: Candidate = {
   googleRating: 4,
   googleRatingsTotal: 100,
   personalRating: null,
-  groupAverage: null,
   snoozedUntil: null,
 };
 const criteria = { minGoogleRating: 3.5 as const, minGoogleReviews: 30 as const };

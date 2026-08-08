@@ -7,7 +7,6 @@ export type Candidate = {
   googleRating: number | null;
   googleRatingsTotal: number;
   personalRating: number | null;
-  groupAverage: number | null;
   snoozedUntil: string | null;
 };
 export type RecommendationPrefs = {
@@ -19,7 +18,6 @@ export type RecommendationPrefs = {
 const EXPONENTS = {
   category: 1,
   personal: 1,
-  group: 1,
   google: 1,
   distance: 1,
 } as const;
@@ -43,7 +41,6 @@ export function filterCandidates<T extends Candidate>(
 export function scoreCandidate(candidate: Candidate, prefs: RecommendationPrefs): number {
   const category = prefs.categoryWeights[candidate.category] ?? 1;
   const personal = candidate.personalRating == null ? 1 : candidate.personalRating / 3;
-  const group = candidate.groupAverage == null ? 1 : candidate.groupAverage / 3;
   const reviewConfidence = candidate.googleRatingsTotal / (candidate.googleRatingsTotal + 20);
   const google =
     candidate.googleRating == null ? 1 : 1 + (candidate.googleRating / 5 - 1) * reviewConfidence;
@@ -51,7 +48,6 @@ export function scoreCandidate(candidate: Candidate, prefs: RecommendationPrefs)
   return (
     category ** EXPONENTS.category *
     personal ** EXPONENTS.personal *
-    group ** EXPONENTS.group *
     google ** EXPONENTS.google *
     distance ** EXPONENTS.distance
   );
