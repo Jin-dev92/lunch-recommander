@@ -33,6 +33,12 @@ describe('createFolder', () => {
     expect(from).not.toHaveBeenCalled();
   });
 
+  it('익명 사용자는 에러를 던진다', async () => {
+    getUser.mockResolvedValue({ data: { user: { id: 'anon', is_anonymous: true } } });
+    await expect(createFolder('새 폴더')).rejects.toThrow('로그인이 필요합니다.');
+    expect(from).not.toHaveBeenCalled();
+  });
+
   it('생성된 row를 도메인 형태로 매핑한다', async () => {
     getUser.mockResolvedValue({ data: { user: { id: 'me' } } });
     const insert = vi.fn().mockReturnValue({

@@ -2,6 +2,7 @@ import { TABLE } from '../constants';
 import { MESSAGES } from '../messages';
 import { supabase } from '../supabaseClient';
 import type { Folder } from '../types/api';
+import { getCurrentUser } from './auth';
 import { assertNoError, unwrap } from './unwrap';
 
 type FolderRow = { id: string; name: string; owner_id: string; created_at: string };
@@ -20,13 +21,12 @@ export async function listFolders(): Promise<Folder[]> {
 }
 
 export async function createFolder(name: string): Promise<Folder> {
-  const { data } = await supabase.auth.getUser();
-  const ownerId = data.user?.id;
-  if (!ownerId) throw new Error(MESSAGES.LOGIN_REQUIRED);
+  const user = await getCurrentUser();
+  if (!user || user.isAnonymous) throw new Error(MESSAGES.LOGIN_REQUIRED);
   const row = unwrap<FolderRow>(
     await supabase
       .from(TABLE.FOLDERS)
-      .insert({ name, owner_id: ownerId })
+      .insert({ name, owner_id: user.id })
       .select('id,name,owner_id,created_at')
       .single(),
   );
