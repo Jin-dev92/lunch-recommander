@@ -8,6 +8,7 @@ export const MESSAGES = {
   RATING_SAVE_FAILED: '평점 저장에 실패했습니다.',
   SNOOZE_FAILED: '스누즈 처리에 실패했습니다.',
   CATEGORY_PREF_SAVE_FAILED: '기호 저장에 실패했습니다.',
+  FOLDER_SAVE_FAILED: '폴더 저장에 실패했습니다.',
   EXCLUDE_CONFIRM: '이 음식점을 추천에서 영구 제외합니다. 되돌릴 수 없어요. 계속할까요?',
   GEOLOCATION_DENIED: '현재 위치 권한이 필요합니다.',
   GEOLOCATION_SETTINGS_REQUIRED: '브라우저 설정에서 위치 권한을 허용해 주세요.',

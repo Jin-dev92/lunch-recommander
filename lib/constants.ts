@@ -53,6 +53,7 @@ export function googleMapsPlaceUrl(name: string, placeId: string): string {
 export const TABLE = {
   RATINGS: 'ratings',
   CATEGORY_PREFS: 'category_prefs',
+  FOLDERS: 'folders',
 } as const;
 
 export const COLUMNS = {
