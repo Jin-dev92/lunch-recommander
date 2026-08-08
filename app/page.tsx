@@ -31,6 +31,9 @@ export default function HomePage() {
         <nav className={styles.actions}>
           {isLoggedIn ? (
             <>
+              <Link className={styles.secondaryAction} href={ROUTES.PLACES}>
+                내 맛집 지도
+              </Link>
               <button
                 className={styles.secondaryAction}
                 onClick={logout}

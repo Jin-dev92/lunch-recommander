@@ -1,0 +1,46 @@
+/* 구조 뼈대만. 토큰(색·간격·타이포)은 디자인 레인에서 채운다. */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.createForm {
+  display: flex;
+  gap: 8px;
+}
+
+.nameInput {
+  flex: 1;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.renameForm {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+}
+
+.folderButton {
+  flex: 1;
+  text-align: left;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+}

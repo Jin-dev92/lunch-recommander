@@ -42,6 +42,15 @@ describe('홈 헤더', () => {
     expect(screen.queryByRole('link', { name: '로그인' })).not.toBeInTheDocument();
   });
 
+  it('로그인 시 내 맛집 지도 링크 노출', async () => {
+    mockUser(false);
+    renderWithQuery(<HomePage />);
+    expect(await screen.findByRole('link', { name: '내 맛집 지도' })).toHaveAttribute(
+      'href',
+      '/places',
+    );
+  });
+
   it('로그인하지 않은 사용자에게는 로그인 링크를 보여줍니다', async () => {
     mockUser(true);
     renderWithQuery(<HomePage />);

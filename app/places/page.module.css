@@ -1,0 +1,11 @@
+/* 구조 뼈대만. 토큰(색·간격·타이포)은 디자인 레인에서 채운다. */
+.main {
+  width: 100%;
+  max-width: 720px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: max(24px, env(safe-area-inset-top)) 20px max(40px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}

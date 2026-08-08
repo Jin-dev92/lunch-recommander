@@ -3,6 +3,7 @@
 export const ROUTES = {
   HOME: '/',
   LOGIN: '/login',
+  PLACES: '/places',
 } as const;
 
 // axiosInstance의 baseURL(Supabase Functions) 기준 상대 경로
