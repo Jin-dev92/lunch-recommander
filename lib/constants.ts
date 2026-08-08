@@ -67,11 +67,6 @@ export const ON_CONFLICT = {
   CATEGORY_PREFS: 'user_id,category',
 } as const;
 
-export const RPC = {
-  CREATE_GROUP: 'create_group',
-  JOIN_GROUP_BY_CODE: 'join_group_by_code',
-} as const;
-
 // 평점 행이 없는 음식점을 스누즈할 때 기록할 중립 점수(0=영구 제외, 5=최고)
 export const NEUTRAL_RATING_SCORE = 3;
 

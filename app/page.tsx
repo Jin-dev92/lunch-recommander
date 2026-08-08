@@ -1,7 +1,6 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import GroupManager from '../components/GroupManager';
 import Map from '../components/Map';
 import Recommend from '../components/Recommend';
 import Spinner from '../components/Spinner';
@@ -32,7 +31,6 @@ export default function HomePage() {
         <nav className={styles.actions}>
           {isLoggedIn ? (
             <>
-              <GroupManager />
               <button
                 className={styles.secondaryAction}
                 onClick={logout}
