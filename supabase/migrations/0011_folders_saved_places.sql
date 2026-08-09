@@ -33,7 +33,8 @@ create policy folders_select on public.folders for select to authenticated
 create policy folders_insert on public.folders for insert to authenticated
   with check (owner_id = auth.uid() and not public.is_anonymous_user());
 create policy folders_update on public.folders for update to authenticated
-  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+  using (owner_id = auth.uid() and not public.is_anonymous_user())
+  with check (owner_id = auth.uid() and not public.is_anonymous_user());
 create policy folders_delete on public.folders for delete to authenticated
   using (owner_id = auth.uid());
 
@@ -47,7 +48,13 @@ create policy saved_places_insert on public.saved_places for insert to authentic
     and exists (select 1 from public.folders f where f.id = folder_id and f.owner_id = auth.uid())
   );
 create policy saved_places_update on public.saved_places for update to authenticated
-  using (exists (select 1 from public.folders f where f.id = folder_id and f.owner_id = auth.uid()))
-  with check (exists (select 1 from public.folders f where f.id = folder_id and f.owner_id = auth.uid()));
+  using (
+    not public.is_anonymous_user()
+    and exists (select 1 from public.folders f where f.id = folder_id and f.owner_id = auth.uid())
+  )
+  with check (
+    not public.is_anonymous_user()
+    and exists (select 1 from public.folders f where f.id = folder_id and f.owner_id = auth.uid())
+  );
 create policy saved_places_delete on public.saved_places for delete to authenticated
   using (exists (select 1 from public.folders f where f.id = folder_id and f.owner_id = auth.uid()));
