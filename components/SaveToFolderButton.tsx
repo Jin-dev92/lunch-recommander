@@ -52,17 +52,27 @@ export default function SaveToFolderButton({ place }: { place: Place }) {
       <button type="button" className={styles.trigger} onClick={open}>
         {MESSAGES.SAVE_TO_FOLDER_BUTTON}
       </button>
-      <dialog
-        className={styles.dialog}
-        ref={dialog}
-        aria-label={MESSAGES.SAVE_TO_FOLDER_BUTTON}
-      >
+      <dialog className={styles.dialog} ref={dialog} aria-labelledby="save-to-folder-title">
+        <h2 id="save-to-folder-title" className={styles.title}>
+          {MESSAGES.SAVE_TO_FOLDER_BUTTON}
+        </h2>
+        <p className={styles.subtitle}>{place.name}</p>
+
         {folders && folders.length === 0 ? (
           <div className={styles.empty}>
             <p>{MESSAGES.SAVE_TO_FOLDER_NO_FOLDERS}</p>
-            <Link href={ROUTES.PLACES} onClick={close}>
+            <Link className={styles.manageLink} href={ROUTES.PLACES} onClick={close}>
               {MESSAGES.SAVE_TO_FOLDER_MANAGE_LINK}
             </Link>
+          </div>
+        ) : saved ? (
+          <div className={styles.saved}>
+            <p className={styles.savedStatus} role="status">
+              {MESSAGES.SAVE_TO_FOLDER_SAVED}
+            </p>
+            <button type="button" onClick={close}>
+              닫기
+            </button>
           </div>
         ) : (
           <>
@@ -77,34 +87,23 @@ export default function SaveToFolderButton({ place }: { place: Place }) {
                       checked={folderId === folder.id}
                       onChange={() => setFolderId(folder.id)}
                     />
-                    {folder.name}
+                    <span className={styles.folderName}>{folder.name}</span>
                   </label>
                 </li>
               ))}
             </ul>
-            {saved ? (
-              <>
-                <p className={styles.savedStatus} role="status">
-                  {MESSAGES.SAVE_TO_FOLDER_SAVED}
-                </p>
-                <button type="button" onClick={close}>
-                  닫기
-                </button>
-              </>
-            ) : (
-              <div className={styles.actions}>
-                <button type="button" onClick={close}>
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={save}
-                  disabled={!folderId || addSavedPlace.isPending}
-                >
-                  저장
-                </button>
-              </div>
-            )}
+            <div className={styles.actions}>
+              <button type="button" onClick={close}>
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={save}
+                disabled={!folderId || addSavedPlace.isPending}
+              >
+                저장
+              </button>
+            </div>
             {addSavedPlace.isError && (
               <p className={styles.error} role="alert">
                 {MESSAGES.SAVE_TO_FOLDER_SAVE_FAILED}
