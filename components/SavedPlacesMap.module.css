@@ -1,0 +1,57 @@
+/* ponytail: 구조만 최소로 잡아 지도·목록·카드가 깨지지 않게 한다. 색·간격 폴리시는 Task 8 Step 6에서 채운다. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Google 지도는 컨테이너에 명시적 높이가 없으면 0px로 렌더된다. */
+.map {
+  height: 240px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+}
+
+.itemButton {
+  flex: 1;
+  text-align: left;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.memoEdit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.memoInput {
+  width: 100%;
+  min-height: 60px;
+  resize: vertical;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+}
+
+.error {
+  margin: 0;
+}

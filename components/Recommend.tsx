@@ -158,7 +158,7 @@ export default function Recommend({
             target="_blank"
             rel="noopener noreferrer"
           >
-            메뉴·리뷰 자세히 보기
+            {MESSAGES.GOOGLE_MAPS_DETAIL_LINK}
           </a>
           {canRate ? (
             <>
