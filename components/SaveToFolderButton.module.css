@@ -1,32 +1,199 @@
-/* 구조 규칙만 정의한다. 색·간격 등 시각 폴리시는 이후 별도 스타일링에서 채운다. */
+.trigger {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 12px;
+  padding: 0 14px;
+  color: var(--color-accent-hover);
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background-color 180ms,
+    box-shadow 180ms,
+    transform 180ms;
+}
+
+.trigger:hover {
+  background: #ffe9e1;
+}
+
+.trigger:active {
+  transform: scale(0.99);
+}
+
+.trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
+}
 
 .dialog {
-  padding: 0;
+  width: calc(100% - 48px);
+  max-width: 340px;
+  padding: 22px 20px 18px;
   border: none;
+  border-radius: 14px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+}
+
+.dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* 다이얼로그 안의 일반 버튼(취소·저장·닫기)의 기본 형태. */
+.dialog button {
+  min-height: 44px;
+  padding: 0 14px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    color 180ms,
+    border-color 180ms,
+    background-color 180ms,
+    box-shadow 180ms,
+    transform 180ms,
+    opacity 180ms;
+}
+
+.dialog button:hover:not(:disabled) {
+  color: var(--color-accent-hover);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.dialog button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.dialog button:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
+}
+
+.dialog button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .empty {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+}
+
+.empty p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.empty a {
+  align-self: flex-start;
+  color: var(--color-accent-hover);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.empty a:hover {
+  text-decoration: underline;
 }
 
 .folderList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 0;
+  gap: 6px;
+  margin: 0 0 16px;
   padding: 0;
   list-style: none;
+  max-height: 240px;
+  overflow-y: auto;
 }
 
 .folderOption {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  transition:
+    border-color 180ms,
+    background-color 180ms;
+}
+
+.folderOption:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.folderOption:has(input:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.folderOption input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-accent);
 }
 
 .actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+/* 저장은 확정 동작이라 강조 채움으로 구분한다. */
+.actions button:last-child {
+  color: #fff;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.actions button:last-child:hover:not(:disabled) {
+  color: #fff;
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.savedStatus {
+  margin: 0 0 12px;
+  color: var(--color-accent-hover);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.error {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  color: var(--color-error-text);
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-card);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trigger,
+  .dialog button,
+  .folderOption {
+    transition: none;
+  }
 }
