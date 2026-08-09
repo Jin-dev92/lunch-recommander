@@ -211,10 +211,13 @@ export default function SavedPlacesMap({
 
       {selected && (
         <div className={styles.detail}>
-          <h3 className={styles.detailName}>{selected.name}</h3>
-          {selected.address && (
-            <p className={styles.detailAddress}>{displayAddress(selected.address)}</p>
-          )}
+          <div className={styles.detailHeader}>
+            <h3 className={styles.detailName}>{selected.name}</h3>
+            {selected.address && (
+              <p className={styles.detailAddress}>{displayAddress(selected.address)}</p>
+            )}
+          </div>
+
           {canEdit ? (
             <div className={styles.memoEdit}>
               <textarea
@@ -224,13 +227,11 @@ export default function SavedPlacesMap({
                 placeholder={MESSAGES.SAVED_PLACE_MEMO_PLACEHOLDER}
                 onChange={(e) => setMemoDraft(e.target.value)}
               />
-              <button
-                type="button"
-                onClick={saveMemo}
-                disabled={updateMemo.isPending}
-              >
-                저장
-              </button>
+              <div className={styles.memoActions}>
+                <button type="button" onClick={saveMemo} disabled={updateMemo.isPending}>
+                  저장
+                </button>
+              </div>
               {updateMemo.isError && (
                 <p className={styles.error} role="alert">
                   {MESSAGES.SAVED_PLACE_MEMO_SAVE_FAILED}
@@ -240,16 +241,17 @@ export default function SavedPlacesMap({
           ) : (
             selected.memo && <p className={styles.detailMemo}>{selected.memo}</p>
           )}
-          <a
-            className={styles.detailLink}
-            href={googleMapsPlaceUrl(selected.name, selected.placeId)}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {MESSAGES.GOOGLE_MAPS_DETAIL_LINK}
-          </a>
-          {canEdit && (
-            <>
+
+          <div className={styles.detailFooter}>
+            <a
+              className={styles.detailLink}
+              href={googleMapsPlaceUrl(selected.name, selected.placeId)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {MESSAGES.GOOGLE_MAPS_DETAIL_LINK}
+            </a>
+            {canEdit && (
               <button
                 type="button"
                 className={styles.deleteButton}
@@ -257,12 +259,12 @@ export default function SavedPlacesMap({
               >
                 삭제
               </button>
-              {deleteSavedPlace.isError && (
-                <p className={styles.error} role="alert">
-                  {MESSAGES.SAVED_PLACE_DELETE_FAILED}
-                </p>
-              )}
-            </>
+            )}
+          </div>
+          {canEdit && deleteSavedPlace.isError && (
+            <p className={styles.error} role="alert">
+              {MESSAGES.SAVED_PLACE_DELETE_FAILED}
+            </p>
           )}
         </div>
       )}
