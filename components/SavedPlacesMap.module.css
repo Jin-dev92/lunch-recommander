@@ -1,14 +1,62 @@
-/* ponytail: 구조만 최소로 잡아 지도·목록·카드가 깨지지 않게 한다. 색·간격 폴리시는 Task 8 Step 6에서 채운다. */
-
 .section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  padding: 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
 /* Google 지도는 컨테이너에 명시적 높이가 없으면 0px로 렌더된다. */
 .map {
   height: 240px;
+  background: var(--color-map-bg);
+  border-radius: var(--radius-card);
+}
+
+/* 목록·상세 안의 일반 버튼(저장·취소·삭제하기 등)의 기본 형태. */
+.section button {
+  min-height: 44px;
+  padding: 0 14px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    color 180ms,
+    border-color 180ms,
+    background-color 180ms,
+    box-shadow 180ms,
+    transform 180ms,
+    opacity 180ms;
+}
+
+.section button:hover:not(:disabled) {
+  color: var(--color-accent-hover);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.section button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.section button:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
+}
+
+.section button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .list {
@@ -26,13 +74,56 @@
 
 .itemButton {
   flex: 1;
+  min-width: 0;
   text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.itemButton.selected {
+  color: var(--color-accent-hover);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.empty {
+  margin: 0;
+  padding: 24px 12px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  text-align: center;
 }
 
 .detail {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  padding: 14px;
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.detailName {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.detailAddress {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.detailMemo {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 .memoEdit {
@@ -44,14 +135,122 @@
 .memoInput {
   width: 100%;
   min-height: 60px;
+  padding: 10px 14px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.6;
   resize: vertical;
+  transition:
+    border-color 180ms,
+    box-shadow 180ms;
 }
 
-.confirmActions {
-  display: flex;
-  gap: 8px;
+.memoInput:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
+}
+
+/* 메모 저장은 확정 동작이라 강조 채움으로 구분한다. */
+.memoEdit button {
+  align-self: flex-start;
+  color: #fff;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.memoEdit button:hover:not(:disabled) {
+  color: #fff;
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.detailLink {
+  align-self: flex-start;
+  color: var(--color-accent-hover);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.detailLink:hover {
+  text-decoration: underline;
+}
+
+.detailLink:focus-visible {
+  outline: none;
+  border-radius: 4px;
+  box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
+}
+
+.deleteButton {
+  align-self: flex-start;
+  color: var(--color-text-muted);
 }
 
 .error {
   margin: 0;
+  padding: 10px 14px;
+  color: var(--color-error-text);
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-card);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.confirmDialog {
+  width: calc(100% - 48px);
+  max-width: 320px;
+  padding: 24px 22px 20px;
+  border: none;
+  border-radius: 14px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+}
+
+.confirmDialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.confirmDialog p {
+  margin: 0 0 20px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.confirmActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* 확인 대화의 삭제하기는 파괴적 동작이므로 강조 채움으로 구분한다. */
+.confirmActions button:last-child {
+  color: #fff;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.confirmActions button:last-child:hover:not(:disabled) {
+  color: #fff;
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+@media (min-width: 480px) {
+  .map {
+    height: 300px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section button,
+  .memoInput {
+    transition: none;
+  }
 }
