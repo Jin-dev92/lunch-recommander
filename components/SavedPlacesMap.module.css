@@ -137,11 +137,19 @@
 .detail {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  background: var(--color-accent-soft);
+  gap: 16px;
+  padding: 16px;
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.detailHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
 .detailName {
@@ -149,6 +157,7 @@
   font-size: 17px;
   font-weight: 700;
   line-height: 1.3;
+  word-break: break-word;
 }
 
 .detailAddress {
@@ -156,6 +165,7 @@
   color: var(--color-text-muted);
   font-size: 13px;
   line-height: 1.5;
+  word-break: break-word;
 }
 
 .detailMemo {
@@ -168,7 +178,12 @@
 .memoEdit {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+}
+
+.memoActions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .memoInput {
@@ -194,24 +209,37 @@
 }
 
 /* 메모 저장은 확정 동작이라 강조 채움으로 구분한다. */
-.memoEdit button {
-  align-self: flex-start;
+.memoActions button {
+  min-width: 88px;
   color: #fff;
   background: var(--color-accent);
   border-color: var(--color-accent);
 }
 
-.memoEdit button:hover:not(:disabled) {
+.memoActions button:hover:not(:disabled) {
   color: #fff;
   background: var(--color-accent-hover);
   border-color: var(--color-accent-hover);
 }
 
+/* 내비게이션(외부 링크)과 파괴적 동작(삭제)을 한 줄에서 좌우로 분리한다. */
+.detailFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
 .detailLink {
-  align-self: flex-start;
+  min-width: 0;
+  overflow: hidden;
   color: var(--color-accent-hover);
   font-size: 14px;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   text-decoration: none;
 }
 
@@ -225,9 +253,16 @@
   box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
 }
 
-.deleteButton {
-  align-self: flex-start;
+/* 삭제는 파괴적이라 평상시엔 잔잔하게, hover에서 위험색으로 대비를 높인다. */
+.detailFooter button {
+  flex-shrink: 0;
   color: var(--color-text-muted);
+}
+
+.detailFooter button:hover:not(:disabled) {
+  color: var(--color-error-text);
+  background: var(--color-error-bg);
+  border-color: var(--color-error-border);
 }
 
 .error {
