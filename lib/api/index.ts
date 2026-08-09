@@ -1,5 +1,6 @@
 export * from './auth';
 export * from './categoryPrefs';
-export * from './groups';
+export * from './folders';
 export * from './ratings';
 export * from './recommend';
+export * from './savedPlaces';

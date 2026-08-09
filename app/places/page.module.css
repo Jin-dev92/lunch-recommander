@@ -1,0 +1,60 @@
+.main {
+  width: 100%;
+  max-width: 720px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: max(24px, env(safe-area-inset-top)) 20px max(40px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.loginRequired {
+  margin: 48px 0 0;
+  color: var(--color-text-muted);
+  font-size: 15px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.loginLink {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 22px;
+  color: #fff;
+  background: var(--color-accent);
+  border: none;
+  border-radius: var(--radius-card);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    background 200ms,
+    transform 200ms,
+    box-shadow 180ms;
+}
+
+.loginLink:hover {
+  background: var(--color-accent-hover);
+}
+
+.loginLink:active {
+  transform: scale(0.98);
+}
+
+.loginLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loginLink {
+    transition: none;
+  }
+}

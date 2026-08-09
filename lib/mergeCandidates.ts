@@ -11,6 +11,8 @@ export function mergeCandidates(
     name: string;
     categoryLabel: string;
     address: string | null;
+    lat: number;
+    lng: number;
     priceLevel: string | null;
     photoName: string | null;
   })[];
@@ -19,14 +21,10 @@ export function mergeCandidates(
   const candidates = restaurants.map((restaurant) => {
     const rows = ratings.filter((rating) => rating.place_id === restaurant.placeId);
     const mine = rows.find((rating) => rating.user_id === currentUserId);
-    const group = rows.filter((rating) => rating.user_id !== currentUserId && rating.score > 0);
     return {
       ...restaurant,
       personalRating: mine?.score ?? null,
       snoozedUntil: mine?.snoozed_until ?? null,
-      groupAverage: group.length
-        ? group.reduce((sum, rating) => sum + rating.score, 0) / group.length
-        : null,
     };
   });
   return {

@@ -3,6 +3,7 @@
 export const ROUTES = {
   HOME: '/',
   LOGIN: '/login',
+  PLACES: '/places',
 } as const;
 
 // axiosInstance의 baseURL(Supabase Functions) 기준 상대 경로
@@ -53,6 +54,8 @@ export function googleMapsPlaceUrl(name: string, placeId: string): string {
 export const TABLE = {
   RATINGS: 'ratings',
   CATEGORY_PREFS: 'category_prefs',
+  FOLDERS: 'folders',
+  SAVED_PLACES: 'saved_places',
 } as const;
 
 export const COLUMNS = {
@@ -65,11 +68,7 @@ export const COLUMNS = {
 export const ON_CONFLICT = {
   RATINGS: 'user_id,place_id',
   CATEGORY_PREFS: 'user_id,category',
-} as const;
-
-export const RPC = {
-  CREATE_GROUP: 'create_group',
-  JOIN_GROUP_BY_CODE: 'join_group_by_code',
+  SAVED_PLACES: 'folder_id,place_id',
 } as const;
 
 // 평점 행이 없는 음식점을 스누즈할 때 기록할 중립 점수(0=영구 제외, 5=최고)
