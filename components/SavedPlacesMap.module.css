@@ -59,7 +59,6 @@
   cursor: not-allowed;
 }
 
-/* 구조만 우선 정의. 색·간격 폴리시는 이후 별도 처리한다. */
 .search {
   display: flex;
   gap: 8px;
@@ -68,6 +67,35 @@
 .searchInput {
   flex: 1;
   min-width: 0;
+  min-height: 44px;
+  padding: 0 14px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 15px;
+  transition:
+    border-color 180ms,
+    box-shadow 180ms;
+}
+
+.searchInput:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
+}
+
+/* 검색 추가는 확정 동작이라 강조 채움으로 구분한다. */
+.search button[type='submit'] {
+  color: #fff;
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.search button[type='submit']:hover:not(:disabled) {
+  color: #fff;
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
 }
 
 .list {
