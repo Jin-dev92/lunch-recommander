@@ -1,0 +1,32 @@
+/* 구조 규칙만 정의한다. 색·간격 등 시각 폴리시는 이후 별도 스타일링에서 채운다. */
+
+.dialog {
+  padding: 0;
+  border: none;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.folderList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.folderOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}

@@ -19,6 +19,7 @@ import { ROUTES } from '../lib/constants';
 import Link from 'next/link';
 import RatingControls from './RatingControls';
 import CategoryPrefs from './CategoryPrefs';
+import SaveToFolderButton from './SaveToFolderButton';
 import Spinner from './Spinner';
 import styles from './Recommend.module.css';
 
@@ -26,6 +27,8 @@ type Result = Candidate & {
   name: string;
   categoryLabel: string;
   address: string | null;
+  lat: number;
+  lng: number;
   priceLevel: string | null;
   photoName: string | null;
   weight: number;
@@ -162,6 +165,16 @@ export default function Recommend({
           </a>
           {canRate ? (
             <>
+              <SaveToFolderButton
+                key={`save-${result.placeId}`}
+                place={{
+                  placeId: result.placeId,
+                  name: result.name,
+                  lat: result.lat,
+                  lng: result.lng,
+                  address: result.address,
+                }}
+              />
               {/* 두 컴포넌트는 선택 상태를 들고 있으므로 대상이 바뀌면 remount해 이전 선택을 지운다. */}
               <RatingControls
                 key={result.placeId}

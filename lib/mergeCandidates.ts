@@ -11,6 +11,8 @@ export function mergeCandidates(
     name: string;
     categoryLabel: string;
     address: string | null;
+    lat: number;
+    lng: number;
     priceLevel: string | null;
     photoName: string | null;
   })[];
