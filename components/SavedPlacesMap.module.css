@@ -59,6 +59,17 @@
   cursor: not-allowed;
 }
 
+/* 구조만 우선 정의. 색·간격 폴리시는 이후 별도 처리한다. */
+.search {
+  display: flex;
+  gap: 8px;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+}
+
 .list {
   display: flex;
   flex-direction: column;

@@ -8,12 +8,21 @@ import type { SavedPlace } from '../lib/types/api';
 const useSavedPlaces = vi.fn();
 const updateMemoMutate = vi.fn();
 const deleteMutate = vi.fn();
+const geocodeMutate = vi.fn();
+const addSavedPlaceMutate = vi.fn();
 vi.mock('../lib/hooks/queries', () => ({
   useSavedPlaces: (...args: unknown[]) => useSavedPlaces(...args),
 }));
 vi.mock('../lib/hooks/mutations', () => ({
   useUpdateSavedPlaceMemo: () => ({ mutate: updateMemoMutate, isPending: false, isError: false }),
   useDeleteSavedPlace: () => ({ mutate: deleteMutate, isPending: false, isError: false }),
+  useGeocode: () => ({ mutate: geocodeMutate, isPending: false, isError: false, error: null }),
+  useAddSavedPlace: () => ({
+    mutate: addSavedPlaceMutate,
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
 }));
 
 // next/script와 전역 google 객체 모킹은 components/Map.test.tsx와 동일한 방식을 따른다.
@@ -50,6 +59,8 @@ beforeEach(() => {
   useSavedPlaces.mockReset();
   updateMemoMutate.mockReset();
   deleteMutate.mockReset();
+  geocodeMutate.mockReset();
+  addSavedPlaceMutate.mockReset();
   mapMock.mockReset();
   markerMock.mockReset();
   setCenter.mockReset();
@@ -161,6 +172,38 @@ describe('저장 맛집 지도', () => {
     useSavedPlaces.mockReturnValue({ data: [], isLoading: false, isError: false });
     renderPlacesMap(<SavedPlacesMap folderId="f1" canEdit={true} />);
     expect(screen.getByText('이 폴더에 저장한 음식점이 아직 없어요.')).toBeInTheDocument();
+  });
+
+  it('검색으로 장소를 찾아 현재 폴더에 추가합니다', () => {
+    useSavedPlaces.mockReturnValue({ data: places, isLoading: false, isError: false });
+    geocodeMutate.mockImplementation(
+      (_query: string, opts?: { onSuccess?: (coords: { lat: number; lng: number }) => void }) => {
+        opts?.onSuccess?.({ lat: 37.123456789, lng: 127.987654321 });
+      },
+    );
+    renderPlacesMap(<SavedPlacesMap folderId="f1" canEdit={true} />);
+
+    fireEvent.change(screen.getByLabelText('장소 검색'), { target: { value: '판교역' } });
+    fireEvent.click(screen.getByRole('button', { name: '추가' }));
+
+    expect(geocodeMutate).toHaveBeenCalledWith('판교역', expect.anything());
+    expect(addSavedPlaceMutate).toHaveBeenCalledWith(
+      {
+        folderId: 'f1',
+        placeId: 'manual:37.123457,127.987654',
+        name: '판교역',
+        lat: 37.123456789,
+        lng: 127.987654321,
+        address: null,
+      },
+      expect.anything(),
+    );
+  });
+
+  it('폴더가 없으면 검색 폼을 보여주지 않습니다', () => {
+    useSavedPlaces.mockReturnValue({ data: undefined, isLoading: false, isError: false });
+    renderPlacesMap(<SavedPlacesMap folderId={null} canEdit={true} />);
+    expect(screen.queryByLabelText('장소 검색')).not.toBeInTheDocument();
   });
 
   it('지도 스크립트 로드에 실패하면 에러 메시지를 보여줍니다', () => {

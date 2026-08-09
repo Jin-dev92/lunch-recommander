@@ -2,7 +2,12 @@
 import Script from 'next/script';
 import { useEffect, useRef, useState } from 'react';
 import { displayAddress, googleMapsPlaceUrl } from '../lib/constants';
-import { useDeleteSavedPlace, useUpdateSavedPlaceMemo } from '../lib/hooks/mutations';
+import {
+  useAddSavedPlace,
+  useDeleteSavedPlace,
+  useGeocode,
+  useUpdateSavedPlaceMemo,
+} from '../lib/hooks/mutations';
 import { useSavedPlaces } from '../lib/hooks/queries';
 import { errorMessage, MESSAGES } from '../lib/messages';
 import { MAPS_SCRIPT_SRC, waitForMapsSdk } from '../lib/googleMaps';
@@ -25,6 +30,8 @@ export default function SavedPlacesMap({
   const { data: places, isLoading, isError, error } = useSavedPlaces(folderId);
   const updateMemo = useUpdateSavedPlaceMemo();
   const deleteSavedPlace = useDeleteSavedPlace();
+  const geocode = useGeocode();
+  const addSavedPlace = useAddSavedPlace();
 
   const mapNode = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -108,6 +115,32 @@ export default function SavedPlacesMap({
     });
   }
 
+  // Google placeId가 없으므로 좌표 기반 합성 키를 쓴다. 소수점 6자리로 고정해야
+  // 같은 지점을 다시 검색해도 같은 placeId가 나와 unique(folder_id, place_id) 제약이
+  // 중복을 흡수한다(upsert ignoreDuplicates는 useSavedPlacesMutations 쪽에서 처리).
+  function searchAndAddPlace(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!folderId) return;
+    const form = event.currentTarget;
+    const query = String(new FormData(form).get('query') ?? '').trim();
+    if (!query) return;
+    geocode.mutate(query, {
+      onSuccess: (coords) => {
+        addSavedPlace.mutate(
+          {
+            folderId,
+            placeId: `manual:${coords.lat.toFixed(6)},${coords.lng.toFixed(6)}`,
+            name: query,
+            lat: coords.lat,
+            lng: coords.lng,
+            address: null,
+          },
+          { onSuccess: () => form.reset() },
+        );
+      },
+    });
+  }
+
   return (
     <section className={styles.section} aria-label="저장한 음식점 지도">
       <Script
@@ -127,6 +160,27 @@ export default function SavedPlacesMap({
       {isError && (
         <p className={styles.error} role="alert">
           {errorMessage(error)}
+        </p>
+      )}
+
+      {canEdit && folderId !== null && (
+        <form className={styles.search} onSubmit={searchAndAddPlace}>
+          <input
+            className={styles.searchInput}
+            type="search"
+            name="query"
+            aria-label="장소 검색"
+            placeholder={MESSAGES.ADDRESS_SEARCH_PLACEHOLDER}
+            maxLength={200}
+          />
+          <button type="submit" disabled={geocode.isPending || addSavedPlace.isPending}>
+            {geocode.isPending || addSavedPlace.isPending ? '추가 중…' : '추가'}
+          </button>
+        </form>
+      )}
+      {(geocode.isError || addSavedPlace.isError) && (
+        <p className={styles.error} role="alert">
+          {errorMessage(geocode.error ?? addSavedPlace.error)}
         </p>
       )}
 
