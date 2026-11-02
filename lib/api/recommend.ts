@@ -4,6 +4,7 @@ import { MESSAGES } from '../messages';
 import { supabase } from '../supabaseClient';
 import type {
   CategoryPrefRow,
+  GeocodeRequest,
   GeocodeResponse,
   NearbyResponse,
   RatingRow,
@@ -46,8 +47,11 @@ export async function getRecommendationData(location: SearchLocation): Promise<R
   };
 }
 
-/** 주소 문자열을 좌표로 변환한다. 지오코딩은 과금 대상이라 사용자가 검색할 때만 호출된다. */
-export async function geocodeAddress(address: string): Promise<GeocodeResponse> {
-  const { data } = await axiosInstance.post<GeocodeResponse>(API_ROUTES.GEOCODE, { address });
+/**
+ * 주소 문자열을 좌표로 변환한다. 외부 API 호출 한도를 쓰므로 사용자가 검색할 때만 호출된다.
+ * near는 국내/해외 provider 선택 기준이다(검색 시점에는 결과 좌표를 아직 모른다).
+ */
+export async function geocodeAddress(request: GeocodeRequest): Promise<GeocodeResponse> {
+  const { data } = await axiosInstance.post<GeocodeResponse>(API_ROUTES.GEOCODE, request);
   return data;
 }

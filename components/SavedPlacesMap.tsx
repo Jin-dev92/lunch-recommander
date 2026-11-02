@@ -1,6 +1,5 @@
 'use client';
-import Script from 'next/script';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { kakaoMapSearchUrl } from '../lib/constants';
 import {
   useAddSavedPlace,
@@ -10,13 +9,8 @@ import {
 } from '../lib/hooks/mutations';
 import { useSavedPlaces } from '../lib/hooks/queries';
 import { errorMessage, MESSAGES } from '../lib/messages';
-import {
-  KAKAO_MAP_LEVEL,
-  KAKAO_MAP_SCRIPT_SRC,
-  loadKakaoMaps,
-  type KakaoMap,
-  type KakaoMarker,
-} from '../lib/kakaoMaps';
+import MapCanvas from './map/MapCanvas';
+import type { MapMarker } from './map/types';
 import styles from './SavedPlacesMap.module.css';
 
 type Coords = { lat: number; lng: number };
@@ -39,12 +33,8 @@ export default function SavedPlacesMap({
   const geocode = useGeocode();
   const addSavedPlace = useAddSavedPlace();
 
-  const mapNode = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<KakaoMap | null>(null);
-  const markersRef = useRef<KakaoMarker[]>([]);
   const confirmDialog = useRef<HTMLDialogElement>(null);
 
-  const [sdkReady, setSdkReady] = useState(false);
   const [mapError, setMapError] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [memoDraft, setMemoDraft] = useState('');
@@ -60,47 +50,22 @@ export default function SavedPlacesMap({
     setMemoDraft(selected?.memo ?? '');
   }, [selected?.id, selected?.memo]);
 
-  // SDK가 준비되면 지도를 한 번만 만들고, 이후 places가 바뀔 때마다(폴더 전환 포함)
-  // 이전 마커를 지우고 다시 그린다.
-  useEffect(() => {
-    if (!sdkReady) return;
-    let cancelled = false;
-
-    (async () => {
-      // autoload=false로 불러온 SDK는 kakao.maps.load 콜백이 초기화 완료를 알려준다.
-      const maps = await loadKakaoMaps();
-      if (cancelled || !mapNode.current) return;
-
-      const first = places?.[0];
-      if (!mapRef.current) {
-        const center = first ?? DEFAULT_MAP_CENTER;
-        mapRef.current = new maps.Map(mapNode.current, {
-          center: new maps.LatLng(center.lat, center.lng),
-          level: KAKAO_MAP_LEVEL.CITY,
-        });
-      }
-      const map = mapRef.current;
-
-      markersRef.current.forEach((marker) => marker.setMap(null));
-      markersRef.current = (places ?? []).map((place) => {
-        const marker = new maps.Marker({
-          position: new maps.LatLng(place.lat, place.lng),
-          map,
-          title: place.name,
-        });
-        maps.event.addListener(marker, 'click', () => setSelectedId(place.id));
-        return marker;
-      });
-
-      if (first) map.setCenter(new maps.LatLng(first.lat, first.lng));
-    })().catch(() => {
-      if (!cancelled) setMapError(MESSAGES.MAP_LOAD_FAILED);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sdkReady, places]);
+  // 핀은 목록과 같은 선택 상태를 여는 보조 시각화라, 좌표만 넘기고 드래그는 두지 않는다.
+  // 매 렌더마다 새 배열을 넘기면 캔버스가 마커를 지우고 다시 그리므로 메모한다.
+  const markers = useMemo<MapMarker[]>(
+    () =>
+      (places ?? []).map((place) => ({
+        id: place.id,
+        lat: place.lat,
+        lng: place.lng,
+        title: place.name,
+      })),
+    [places],
+  );
+  // 첫 저장 맛집을 지도 중심으로 삼는다. 이 좌표가 국내/해외 provider도 결정한다.
+  const first = places?.[0];
+  const center = first ? { lat: first.lat, lng: first.lng } : DEFAULT_MAP_CENTER;
+  const onMapError = useCallback(() => setMapError(MESSAGES.MAP_LOAD_FAILED), []);
 
   function saveMemo() {
     if (!selected) return;
@@ -126,34 +91,39 @@ export default function SavedPlacesMap({
     const form = event.currentTarget;
     const query = String(new FormData(form).get('query') ?? '').trim();
     if (!query) return;
-    geocode.mutate(query, {
-      onSuccess: (coords) => {
-        addSavedPlace.mutate(
-          {
-            folderId,
-            placeId: `manual:${coords.lat.toFixed(6)},${coords.lng.toFixed(6)}`,
-            name: query,
-            lat: coords.lat,
-            lng: coords.lng,
-            address: null,
-          },
-          { onSuccess: () => form.reset() },
-        );
+    // 현재 지도 중심을 함께 보내 서버가 국내/해외 지오코딩 provider를 고르게 한다.
+    geocode.mutate(
+      { address: query, near: center },
+      {
+        onSuccess: (coords) => {
+          addSavedPlace.mutate(
+            {
+              folderId,
+              placeId: `manual:${coords.lat.toFixed(6)},${coords.lng.toFixed(6)}`,
+              name: query,
+              lat: coords.lat,
+              lng: coords.lng,
+              address: null,
+            },
+            { onSuccess: () => form.reset() },
+          );
+        },
       },
-    });
+    );
   }
 
   return (
     <section className={styles.section} aria-label="저장한 음식점 지도">
-      <Script
-        src={KAKAO_MAP_SCRIPT_SRC}
-        strategy="afterInteractive"
-        onLoad={() => setSdkReady(true)}
-        onReady={() => setSdkReady(true)}
-        onError={() => setMapError(MESSAGES.MAP_LOAD_FAILED)}
-      />
       {/* 핀은 목록과 같은 선택 상태를 여는 보조 시각화라, 실제 상호작용은 아래 목록으로 제공한다. */}
-      <div className={styles.map} ref={mapNode} aria-hidden="true" />
+      <MapCanvas
+        center={center}
+        zoomLevel="city"
+        markers={markers}
+        onMarkerClick={setSelectedId}
+        onError={onMapError}
+        className={styles.map}
+        ariaHidden
+      />
       {mapError && (
         <p className={styles.error} role="alert">
           {mapError}

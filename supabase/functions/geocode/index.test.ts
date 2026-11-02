@@ -1,5 +1,5 @@
 import { assertEquals } from 'jsr:@std/assert';
-import { createGeocodeHandler, type GeocodeDeps } from './index.ts';
+import { createGeocodeHandler, createGeocoder, nearProvider, type GeocodeDeps } from './index.ts';
 
 function makeDeps(overrides: Partial<GeocodeDeps> = {}): GeocodeDeps {
   return {
@@ -90,4 +90,58 @@ Deno.test('카카오 조회가 실패하면 502를 돌려줍니다', async () =>
   );
   const response = await handler(request({ address: '서울' }));
   assertEquals(response.status, 502);
+});
+
+Deno.test('nearProvider: 국내 좌표는 카카오, 해외 좌표는 Google을 고릅니다', () => {
+  assertEquals(nearProvider({ lat: 37.5665, lng: 126.978 }), 'kakao'); // 서울
+  assertEquals(nearProvider({ lat: 33.4996, lng: 126.5312 }), 'kakao'); // 제주
+  assertEquals(nearProvider({ lat: 48.8566, lng: 2.3522 }), 'google'); // 파리
+  assertEquals(nearProvider({ lat: 35.6762, lng: 139.6503 }), 'google'); // 도쿄
+  // 느슨한 사각형을 쓰면 후쿠오카가 국내로 오판돼 카카오에서 빈 결과가 온다.
+  assertEquals(nearProvider({ lat: 33.5904, lng: 130.4017 }), 'google'); // 후쿠오카
+});
+
+Deno.test('nearProvider: near가 없거나 좌표가 아니면 국내로 간주합니다', () => {
+  // 주 사용 환경이 국내이고, 틀렸더라도 지도를 옮긴 뒤 다시 검색하면 올바른 provider로 간다.
+  assertEquals(nearProvider(undefined), 'kakao');
+  assertEquals(nearProvider(null), 'kakao');
+  assertEquals(nearProvider('서울'), 'kakao');
+  assertEquals(nearProvider({}), 'kakao');
+  assertEquals(nearProvider({ lat: 'x', lng: 'y' }), 'kakao');
+  assertEquals(nearProvider({ lat: NaN, lng: 127 }), 'kakao');
+});
+
+Deno.test('near 좌표로 고른 provider를 지오코더에 넘깁니다', async () => {
+  const seen: string[] = [];
+  const handler = createGeocodeHandler(
+    makeDeps({
+      geocode: async (_address, provider) => {
+        seen.push(provider);
+        return { lat: 1, lng: 1 };
+      },
+    }),
+  );
+
+  await handler(request({ address: '판교역', near: { lat: 37.5, lng: 127.0 } }));
+  await handler(request({ address: 'Eiffel Tower', near: { lat: 48.85, lng: 2.35 } }));
+
+  assertEquals(seen, ['kakao', 'google']);
+});
+
+Deno.test('createGeocoder: provider에 따라 카카오/Google 지오코더를 고릅니다', async () => {
+  const calls: string[] = [];
+  const geocode = createGeocoder(
+    async () => {
+      calls.push('kakao');
+      return { lat: 37.5, lng: 127 };
+    },
+    async () => {
+      calls.push('google');
+      return { lat: 48.85, lng: 2.35 };
+    },
+  );
+
+  assertEquals(await geocode('판교역', 'kakao'), { lat: 37.5, lng: 127 });
+  assertEquals(await geocode('Eiffel Tower', 'google'), { lat: 48.85, lng: 2.35 });
+  assertEquals(calls, ['kakao', 'google']);
 });
