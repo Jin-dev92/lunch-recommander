@@ -23,28 +23,18 @@ const location = { lat: 37, lng: 127, radius: 500 as const };
 const restaurant = {
   placeId: 'p1',
   name: '식당',
-  category: 'korean_restaurant',
-  categoryLabel: '한식',
-  address: '대한민국 서울특별시 성북구 테스트로 1',
+  // 카카오 category_name("음식점 > 한식 > 육류,고기")을 nearby가 쪼개 준 두 값.
+  category: '한식',
+  categoryLabel: '육류,고기',
+  address: '서울 성북구 테스트로 1',
   lat: 37,
   lng: 127,
-  googleRating: 4,
-  googleRatingsTotal: 30,
-  priceLevel: null,
-  photoName: null,
+  placeUrl: 'https://place.map.kakao.com/p1',
   distanceMeters: 50,
 };
 
 function mockNearby(restaurants: unknown[]) {
   return { data: { restaurants, source: 'cache' } };
-}
-
-// nearby와 place-photo가 같은 axiosInstance.post를 쓰므로 경로로 응답을 나눈다.
-function mockPostByRoute(restaurants: unknown[], photoUri?: string) {
-  post.mockImplementation((url: string) => {
-    if (url === '/place-photo') return Promise.resolve({ data: { photoUri } });
-    return Promise.resolve(mockNearby(restaurants));
-  });
 }
 
 function mockTables(
@@ -78,19 +68,20 @@ describe('추천 실행', () => {
     renderWithQuery(<Recommend location={location} canRate />);
     fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: '식당' })).toBeInTheDocument());
-    expect(screen.getByText('한식 · 50m')).toBeInTheDocument();
+    expect(screen.getByText('육류,고기 · 50m')).toBeInTheDocument();
     expect(post).toHaveBeenCalledWith('/nearby', location);
   });
 
-  it('추천 결과에 Google 지도 상세 링크를 보여줍니다', async () => {
+  it('추천 결과에 카카오맵 장소 상세 링크를 보여줍니다', async () => {
     post.mockResolvedValue(mockNearby([restaurant]));
     mockTables();
     renderWithQuery(<Recommend location={location} canRate />);
     fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
     const link = (await screen.findByRole('link', {
-      name: '메뉴·리뷰 자세히 보기',
+      name: '메뉴·사진·리뷰 자세히 보기',
     })) as HTMLAnchorElement;
-    expect(link.href).toContain('query_place_id=p1');
+    // nearby가 돌려준 place_url을 그대로 쓴다(조립하지 않는다).
+    expect(link.href).toBe('https://place.map.kakao.com/p1');
     // 외부 새 탭 이동 시 opener 노출을 막아야 한다.
     expect(link.rel).toContain('noopener');
     expect(link.target).toBe('_blank');
@@ -158,15 +149,13 @@ describe('추천 실행', () => {
     random.mockRestore();
   });
 
-  it('추천 결과에 국가명을 뗀 주소를 보여줍니다', async () => {
+  it('추천 결과에 주소를 보여줍니다', async () => {
     post.mockResolvedValue(mockNearby([restaurant]));
     mockTables();
     renderWithQuery(<Recommend location={location} canRate />);
     fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
-    // '대한민국 '을 뗀 형태로 표시한다.
-    await waitFor(() =>
-      expect(screen.getByText('서울특별시 성북구 테스트로 1')).toBeInTheDocument(),
-    );
+    // 카카오 주소에는 국가명이 붙지 않으므로 받은 값을 그대로 보여준다.
+    await waitFor(() => expect(screen.getByText('서울 성북구 테스트로 1')).toBeInTheDocument());
   });
 
   it('주소가 없으면 주소 줄을 그리지 않습니다', async () => {
@@ -176,27 +165,6 @@ describe('추천 실행', () => {
     fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: '식당' })).toBeInTheDocument());
     expect(screen.queryByText(/성북구 테스트로 1/)).not.toBeInTheDocument();
-  });
-
-  it('가격대가 있으면 카테고리·거리와 함께 ₩ 기호로 보여줍니다', async () => {
-    mockPostByRoute([{ ...restaurant, priceLevel: 'PRICE_LEVEL_MODERATE' }]);
-    mockTables();
-    renderWithQuery(<Recommend location={location} canRate />);
-    fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
-    await waitFor(() => expect(screen.getByText('한식 · ₩₩ · 50m')).toBeInTheDocument());
-  });
-
-  it('사진이 있으면 썸네일을 조회해 이름 옆에 보여줍니다', async () => {
-    mockPostByRoute(
-      [{ ...restaurant, photoName: 'places/p1/photos/x' }],
-      'https://lh3.googleusercontent.com/photo',
-    );
-    mockTables();
-    renderWithQuery(<Recommend location={location} canRate />);
-    fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
-    const img = (await screen.findByRole('img')) as HTMLImageElement;
-    expect(img.src).toBe('https://lh3.googleusercontent.com/photo');
-    expect(post).toHaveBeenCalledWith('/place-photo', { photoName: 'places/p1/photos/x' });
   });
 
   it('로그인한 사용자에게는 평가 컨트롤을 보여줍니다', async () => {
@@ -221,14 +189,17 @@ describe('추천 실행', () => {
     expect(screen.getByRole('link', { name: '로그인' })).toHaveAttribute('href', '/login');
   });
 
-  it('사진 정보가 없으면 썸네일을 조회하지 않습니다', async () => {
+  it('카카오에는 사진·가격대가 없어 썸네일과 ₩ 표기를 그리지 않습니다', async () => {
     post.mockResolvedValue(mockNearby([restaurant]));
     mockTables();
     renderWithQuery(<Recommend location={location} canRate />);
     fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: '식당' })).toBeInTheDocument());
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
-    expect(post).not.toHaveBeenCalledWith('/place-photo', expect.anything());
+    expect(screen.queryByText(/₩/)).not.toBeInTheDocument();
+    // nearby 외에 다른 Edge Function을 부르지 않는다(사진 조회 함수는 제거됐다).
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post).toHaveBeenCalledWith('/nearby', location);
   });
 
   it('위치가 없으면 버튼이 비활성화됩니다', () => {
@@ -272,45 +243,21 @@ describe('추천 실행', () => {
     );
   });
 
-  it('선택한 Google 평점과 리뷰 수 기준을 모두 만족하는 후보만 추천합니다', async () => {
+  it('선택한 음식 종류에 해당하는 후보만 추천합니다', async () => {
     post.mockResolvedValue(
       mockNearby([
-        {
-          ...restaurant,
-          placeId: 'low-rating',
-          name: '평점 미달',
-          googleRating: 4.4,
-          googleRatingsTotal: 50,
-        },
-        {
-          ...restaurant,
-          placeId: 'low-reviews',
-          name: '리뷰 미달',
-          googleRating: 4.5,
-          googleRatingsTotal: 49,
-        },
-        {
-          ...restaurant,
-          placeId: 'qualified',
-          name: '조건 충족',
-          googleRating: 4.5,
-          googleRatingsTotal: 50,
-        },
+        { ...restaurant, placeId: 'chinese', name: '중식당', category: '중식' },
+        { ...restaurant, placeId: 'japanese', name: '일식당', category: '일식' },
+        { ...restaurant, placeId: 'qualified', name: '한식당', category: '한식' },
       ]),
     );
     mockTables();
-    renderWithQuery(
-      <Recommend
-        location={location}
-        criteria={{ minGoogleRating: 4.5, minGoogleReviews: 50 }}
-        canRate
-      />,
-    );
+    renderWithQuery(<Recommend location={location} criteria={{ category: '한식' }} canRate />);
 
     fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
 
     await waitFor(() =>
-      expect(screen.getByRole('heading', { name: '조건 충족' })).toBeInTheDocument(),
+      expect(screen.getByRole('heading', { name: '한식당' })).toBeInTheDocument(),
     );
   });
 

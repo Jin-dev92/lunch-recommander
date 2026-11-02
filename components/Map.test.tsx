@@ -41,47 +41,69 @@ vi.mock('next/script', () => ({
 
 import Map from './Map';
 
-// ponytail: 실제 Google Maps SDK를 로드하면 네트워크 호출이 발생하므로 전역 google 객체를 모킹.
-// 핀 이동을 검증해야 하므로 addListener로 등록된 핸들러를 listeners에 모아 테스트에서 직접 호출한다.
+// ponytail: 실제 카카오맵 SDK를 로드하면 네트워크 호출이 발생하므로 전역 kakao 객체를 모킹.
+// 핀 이동을 검증해야 하므로 kakao.maps.event.addListener로 등록된 핸들러를 listeners에
+// 모아 테스트에서 직접 호출한다. 카카오 마커의 dragend 콜백은 인자를 받지 않으므로
+// 핸들러도 인자 없이 호출하고, 새 좌표는 marker.getPosition()이 돌려주게 만든다.
+type MockLatLng = { getLat(): number; getLng(): number };
+
 const mapMock = vi.fn();
 const markerMock = vi.fn();
-let listeners: Record<string, (event: unknown) => void>;
+let listeners: Record<string, (event: { latLng: MockLatLng }) => void>;
 const setPosition = vi.fn();
-const setVisible = vi.fn();
+const setMarkerMap = vi.fn();
+const getPosition = vi.fn();
 const setCenter = vi.fn();
-const setZoom = vi.fn();
-
-function latLng(lat: number, lng: number) {
-  return { lat: () => lat, lng: () => lng };
+const setLevel = vi.fn();
+/** 카카오 LatLng는 생성자로 만들고 getLat/getLng로 읽는다. */
+function latLng(lat: number, lng: number): MockLatLng {
+  return { getLat: () => lat, getLng: () => lng };
 }
+
+// kakao.maps.load 콜백을 즉시 실행하지 않고 보류시켜, 초기화가 늦게 끝나는 경우를 재현한다.
+let deferLoad = false;
+let pendingLoad: (() => void) | undefined;
 
 beforeEach(() => {
   scriptShouldFail = false;
+  deferLoad = false;
+  pendingLoad = undefined;
   geocodePost.mockReset();
   listeners = {};
   setPosition.mockReset();
-  setVisible.mockReset();
+  setMarkerMap.mockReset();
+  getPosition.mockReset();
   setCenter.mockReset();
-  setZoom.mockReset();
-  const addListener = (event: string, handler: (e: unknown) => void) => {
-    listeners[event] = handler;
-  };
+  setLevel.mockReset();
   mapMock.mockReset();
   markerMock.mockReset();
-  mapMock.mockImplementation(() => ({ addListener, setCenter, setZoom }));
-  markerMock.mockImplementation(() => ({ addListener, setPosition, setVisible }));
-  // 실제 SDK는 loading=async에서 요청한 라이브러리만 채운다. Map은 'maps', Marker는 'marker'
-  // 소속이며 전역 google.maps에는 놓이지 않는다. 목이 전역에 다 얹어두면 라이브러리를
-  // 빠뜨린 코드가 테스트를 통과해 버리므로, 여기서도 importLibrary로만 제공한다.
-  (globalThis as unknown as { google: typeof google }).google = {
+  mapMock.mockImplementation(() => ({ setCenter, setLevel }));
+  markerMock.mockImplementation(() => ({
+    setPosition,
+    setMap: setMarkerMap,
+    getPosition,
+  }));
+  (globalThis as unknown as { kakao: unknown }).kakao = {
     maps: {
-      importLibrary: vi.fn(async (name: string) => {
-        if (name === 'maps') return { Map: mapMock };
-        if (name === 'marker') return { Marker: markerMock };
-        throw new Error(`요청하지 않은 라이브러리: ${name}`);
-      }),
+      // autoload=false로 불러온 SDK는 이 콜백으로 초기화 완료를 알린다.
+      load: (callback: () => void) => {
+        if (deferLoad) pendingLoad = callback;
+        else callback();
+      },
+      LatLng: vi.fn((lat: number, lng: number) => latLng(lat, lng)),
+      Map: mapMock,
+      Marker: markerMock,
+      event: {
+        addListener: (
+          _target: unknown,
+          event: string,
+          handler: (e: { latLng: MockLatLng }) => void,
+        ) => {
+          listeners[event] = handler;
+        },
+      },
     },
-  } as unknown as typeof google;
+  };
 });
 
 describe('지도', () => {
@@ -92,18 +114,18 @@ describe('지도', () => {
 
     renderMap(<Map onLocationChange={vi.fn()} />);
 
+    // 카카오 레벨은 숫자가 작을수록 확대된다. 좌표를 모를 때는 도시 전체가 보이는 레벨 6.
     await waitFor(() =>
       expect(mapMock).toHaveBeenCalledWith(expect.anything(), {
-        center: { lat: 37.5665, lng: 126.978 },
-        zoom: 13,
-        mapTypeControl: false,
+        center: expect.objectContaining({ getLat: expect.any(Function) }),
+        level: 6,
       }),
     );
-    expect(markerMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        visible: false,
-      }),
-    );
+    expect(mapMock.mock.calls[0][1].center.getLat()).toBe(37.5665);
+    expect(mapMock.mock.calls[0][1].center.getLng()).toBe(126.978);
+    // 카카오 마커에는 setVisible이 없다. 좌표를 모르는 동안에는 지도에 붙이지 않는다.
+    expect(markerMock).toHaveBeenCalledWith(expect.objectContaining({ draggable: true }));
+    expect(setMarkerMap).not.toHaveBeenCalled();
   });
 
   it('주소를 검색하면 지오코딩 좌표로 위치를 옮깁니다', async () => {
@@ -157,12 +179,13 @@ describe('지도', () => {
     expect(onRefresh).toHaveBeenCalledOnce();
   });
 
-  it('스크립트 준비 직후 Google Maps 라이브러리가 늦게 노출돼도 지도를 만듭니다', async () => {
-    const maps = (globalThis as unknown as { google: typeof google }).google.maps;
-    const importLibrary = maps.importLibrary;
-    Object.defineProperty(maps, 'importLibrary', { value: undefined, configurable: true });
+  it('스크립트 준비 직후 카카오 SDK 전역이 늦게 노출돼도 지도를 만듭니다', async () => {
+    // next/script의 준비 이벤트가 스크립트 본문 실행보다 먼저 뜰 수 있다.
+    const global = globalThis as unknown as { kakao: unknown };
+    const kakao = global.kakao;
+    global.kakao = undefined;
     window.setTimeout(() => {
-      Object.defineProperty(maps, 'importLibrary', { value: importLibrary, configurable: true });
+      global.kakao = kakao;
     }, 10);
     vi.stubGlobal('navigator', {
       geolocation: { getCurrentPosition: vi.fn() },
@@ -173,7 +196,7 @@ describe('지도', () => {
     await waitFor(() => expect(mapMock).toHaveBeenCalledTimes(1));
   });
 
-  it('검색 반경과 추천 품질 조건을 제공합니다', () => {
+  it('검색 반경과 음식 종류 조건을 제공합니다', () => {
     vi.stubGlobal('navigator', {
       geolocation: { getCurrentPosition: vi.fn() },
     });
@@ -182,31 +205,27 @@ describe('지도', () => {
     expect(screen.getByRole('option', { name: '300m' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '500m' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '1km' })).toBeInTheDocument();
-    expect(screen.getByLabelText('최소 평점')).toHaveValue('3.5');
-    expect(screen.getByLabelText('최소 리뷰 수')).toHaveValue('30');
-    expect(screen.getByRole('option', { name: '평점 5.0 이상' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: '리뷰 100개 이상' })).toBeInTheDocument();
+    // 카카오 로컬 API에는 평점·리뷰 수가 없어 음식 종류로만 후보를 좁힌다.
+    expect(screen.getByLabelText('음식 종류')).toHaveValue('전체');
+    expect(screen.getByRole('option', { name: '한식' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '술집' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('최소 평점')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('최소 리뷰 수')).not.toBeInTheDocument();
     expect(screen.getByLabelText('주변 지도')).not.toHaveAttribute('style');
   });
 
-  it('추천 품질 조건을 변경하면 콜백에 완전한 조건을 전달합니다', () => {
+  it('음식 종류를 변경하면 콜백에 새 조건을 전달합니다', () => {
     vi.stubGlobal('navigator', {
       geolocation: { getCurrentPosition: vi.fn() },
     });
     const onCriteriaChange = vi.fn();
     renderMap(<Map onLocationChange={vi.fn()} onCriteriaChange={onCriteriaChange} />);
 
-    fireEvent.change(screen.getByLabelText('최소 평점'), { target: { value: '4.5' } });
-    expect(onCriteriaChange).toHaveBeenLastCalledWith({
-      minGoogleRating: 4.5,
-      minGoogleReviews: 30,
-    });
+    fireEvent.change(screen.getByLabelText('음식 종류'), { target: { value: '한식' } });
+    expect(onCriteriaChange).toHaveBeenLastCalledWith({ category: '한식' });
 
-    fireEvent.change(screen.getByLabelText('최소 리뷰 수'), { target: { value: '70' } });
-    expect(onCriteriaChange).toHaveBeenLastCalledWith({
-      minGoogleRating: 4.5,
-      minGoogleReviews: 70,
-    });
+    fireEvent.change(screen.getByLabelText('음식 종류'), { target: { value: '전체' } });
+    expect(onCriteriaChange).toHaveBeenLastCalledWith({ category: '전체' });
   });
 
   it('현재 위치를 얻으면 콜백과 지도를 초기화합니다', async () => {
@@ -223,18 +242,21 @@ describe('지도', () => {
         radius: 500,
       }),
     );
+    // 좌표가 확정되면 가게가 구분되는 레벨 3으로 만든다.
     expect(mapMock).toHaveBeenCalledWith(expect.anything(), {
-      center: { lat: 37.5, lng: 127.0 },
-      zoom: 16,
-      mapTypeControl: false,
+      center: expect.objectContaining({ getLat: expect.any(Function) }),
+      level: 3,
     });
+    expect(mapMock.mock.calls[0][1].center.getLat()).toBe(37.5);
+    expect(mapMock.mock.calls[0][1].center.getLng()).toBe(127.0);
     expect(markerMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        position: { lat: 37.5, lng: 127.0 },
-        map: expect.anything(),
+        position: expect.objectContaining({ getLat: expect.any(Function) }),
         draggable: true,
       }),
     );
+    // 좌표를 알았으니 마커를 지도에 붙인다(카카오에는 setVisible이 없다).
+    expect(setMarkerMap).toHaveBeenCalled();
   });
 
   it('고정밀 측위를 요청합니다', async () => {
@@ -261,7 +283,9 @@ describe('지도', () => {
     renderMap(<Map onLocationChange={onLocationChange} />);
     await waitFor(() => expect(markerMock).toHaveBeenCalled());
 
-    listeners.dragend({ latLng: latLng(37.6, 127.1) });
+    // 카카오 dragend 콜백은 인자를 받지 않는다. 새 좌표는 마커에서 직접 읽는다.
+    getPosition.mockReturnValue(latLng(37.6, 127.1));
+    listeners.dragend({ latLng: latLng(0, 0) });
 
     await waitFor(() =>
       expect(onLocationChange).toHaveBeenCalledWith({ lat: 37.6, lng: 127.1, radius: 500 }),
@@ -300,15 +324,9 @@ describe('지도', () => {
     expect(mapMock).not.toHaveBeenCalled();
   });
 
-  it('SDK가 좌표보다 늦게 준비돼도 지도를 만듭니다', async () => {
+  it('SDK 초기화가 좌표보다 늦게 끝나도 지도를 만듭니다', async () => {
     // 예전 구현은 좌표가 오는 순간 한 번만 검사하고 실패로 확정해 다시 시도하지 않았다.
-    let resolveLibrary: (value: unknown) => void = () => {};
-    const pending = new Promise((resolve) => {
-      resolveLibrary = resolve;
-    });
-    (globalThis as unknown as { google: typeof google }).google.maps.importLibrary = vi
-      .fn()
-      .mockReturnValue(pending) as unknown as typeof google.maps.importLibrary;
+    deferLoad = true;
 
     const getCurrentPosition = vi.fn((success) =>
       success({ coords: { latitude: 37.5, longitude: 127.0 } }),
@@ -316,10 +334,11 @@ describe('지도', () => {
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
     renderMap(<Map onLocationChange={vi.fn()} />);
 
+    await waitFor(() => expect(pendingLoad).toBeDefined());
     expect(mapMock).not.toHaveBeenCalled();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
-    resolveLibrary({ Map: mapMock, Marker: markerMock });
+    pendingLoad?.();
 
     await waitFor(() => expect(mapMock).toHaveBeenCalledTimes(1));
   });

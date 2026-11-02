@@ -10,12 +10,9 @@ describe('후보 병합', () => {
         category: '한식',
         categoryLabel: '한식 라벨',
         address: null,
-        priceLevel: null,
-        photoName: null,
         lat: 37,
         lng: 127,
-        googleRating: 4,
-        googleRatingsTotal: 10,
+        placeUrl: 'https://place.map.kakao.com/1',
         distanceMeters: 50,
       },
     ];

@@ -80,7 +80,7 @@ Deno.test('주소를 찾지 못하면 404를 돌려줍니다', async () => {
   assertEquals(response.status, 404);
 });
 
-Deno.test('Google 조회가 실패하면 502를 돌려줍니다', async () => {
+Deno.test('카카오 조회가 실패하면 502를 돌려줍니다', async () => {
   const handler = createGeocodeHandler(
     makeDeps({
       geocode: async () => {

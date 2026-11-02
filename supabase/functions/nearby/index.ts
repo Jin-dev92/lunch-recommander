@@ -3,29 +3,28 @@ import { checkRateLimit, type UsageStore } from '../_shared/rateLimit.ts';
 import { withCors } from '../_shared/cors.ts';
 
 export type NearbyRestaurant = {
+  // 카카오 장소 식별자(로컬 API documents[].id)
   placeId: string;
   name: string;
-  // category는 Google의 primaryType(korean_restaurant 등) 기계값이다. 선호 가중치의 저장 키이자
-  // 점수 계산 기준이므로 표기가 바뀌지 않는 값을 쓴다. 화면에는 categoryLabel을 보여준다.
+  // category는 카카오 category_name("음식점 > 한식 > 육류,고기")의 2단계 값("한식")이다.
+  // 선호 가중치의 저장 키이자 음식 종류 필터 기준이므로 표기가 바뀌지 않는 값을 쓴다.
+  // 화면에는 더 구체적인 categoryLabel을 보여준다.
   category: string;
   categoryLabel: string;
-  // 사람이 읽는 주소(formattedAddress). 좌표만으로 위치를 알기 어려워 함께 보관한다.
+  // 사람이 읽는 주소(도로명 우선). 좌표만으로 위치를 알기 어려워 함께 보관한다.
   address: string | null;
   lat: number;
   lng: number;
-  googleRating: number | null;
-  googleRatingsTotal: number;
-  // Google priceLevel 열거형. 실제 가격이 아니라 4단계 등급이며, 없는 가게가 많아 null 허용.
-  priceLevel: string | null;
-  // 사진 리소스 이름. 실제 이미지는 추천된 1곳에 한해 place-photo 함수가 해석한다.
-  photoName: string | null;
+  // 카카오맵 장소 상세 페이지(place_url). 카카오 로컬 API에는 사진·평점·가격대가 없어서
+  // 메뉴·사진·리뷰는 이 링크로 넘긴다. 캐시 적중 시에도 링크가 살아 있어야 해 DB에 보관한다.
+  placeUrl: string;
   distanceMeters: number;
 };
 export type NearbyDeps = {
   authenticate: (jwt: string) => Promise<{ id: string } | null>;
   checkLimit: (userId: string, ip: string) => Promise<boolean>;
   findCached: (lat: number, lng: number, radius: number) => Promise<NearbyRestaurant[]>;
-  fetchGoogle: (lat: number, lng: number, radius: number) => Promise<NearbyRestaurant[]>;
+  fetchKakao: (lat: number, lng: number, radius: number) => Promise<NearbyRestaurant[]>;
   upsert: (rows: NearbyRestaurant[]) => Promise<void>;
 };
 
@@ -53,19 +52,29 @@ export function createNearbyHandler(deps: NearbyDeps) {
     if (cached.length) return Response.json({ restaurants: cached, source: 'cache' });
     let restaurants: NearbyRestaurant[];
     try {
-      restaurants = await deps.fetchGoogle(body.lat, body.lng, body.radius);
+      restaurants = await deps.fetchKakao(body.lat, body.lng, body.radius);
     } catch {
       return Response.json({ error: '외부 위치 정보 조회에 실패했습니다.' }, { status: 502 });
     }
     await deps.upsert(restaurants);
-    return Response.json({ restaurants, source: 'google' });
+    return Response.json({ restaurants, source: 'kakao' });
   };
 }
 
-// --- 운영 어댑터: 아래는 실제 Supabase/Google 연동입니다. 테스트에서는 사용하지 않습니다. ---
+// --- 운영 어댑터: 아래는 실제 Supabase/카카오 연동입니다. 테스트에서는 사용하지 않습니다. ---
 
 const CACHE_TTL_MS = 15 * 60 * 1000;
 
+// 카카오 로컬 API의 음식점 카테고리 그룹 코드. CE7(카페)은 별개 코드라 여기에 포함되지 않는다.
+// @see https://developers.kakao.com/docs/ko/local/dev-guide
+const KAKAO_CATEGORY_GROUP_FOOD = 'FD6';
+// 카테고리 검색의 한 페이지 최대 건수는 15다. 음식 종류 필터가 후보를 더 좁히므로
+// 첫 페이지가 꽉 찼을 때만 두 번째 페이지를 더 받아 추천 풀을 넓힌다(최대 2회 호출).
+const KAKAO_PAGE_SIZE = 15;
+const KAKAO_MAX_PAGES = 2;
+
+// 거리는 캐시 행과 신규 조회 모두 이 함수로 계산한다. 카카오 응답에도 distance가 있지만
+// 캐시 경로에는 없어서, 두 경로의 값이 어긋나지 않도록 한 가지 계산만 쓴다.
 function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
   const toRad = (deg: number) => (deg * Math.PI) / 180;
@@ -98,51 +107,66 @@ export function createUsageStore(supabase: RpcClient): UsageStore {
   };
 }
 
-export function createGoogleFetcher(googlePlacesApiKey: string): NearbyDeps['fetchGoogle'] {
+/**
+ * 카카오 category_name("음식점 > 한식 > 육류,고기")을 저장 키와 표시 라벨로 쪼갠다.
+ * 2단계 값이 저장 키(category_prefs.category와 짝)이고, 마지막 단계가 화면 표시용이다.
+ */
+export function splitCategoryName(categoryName: string): {
+  category: string;
+  categoryLabel: string;
+} {
+  const parts = categoryName
+    .split('>')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const category = parts[1] ?? '기타';
+  // 단계가 2개 이하면 더 구체적인 라벨이 없으므로 저장 키를 그대로 보여준다.
+  return { category, categoryLabel: parts.length > 2 ? parts[parts.length - 1] : category };
+}
+
+export function createKakaoFetcher(kakaoRestApiKey: string): NearbyDeps['fetchKakao'] {
   return async (lat, lng, radius) => {
-    const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': googlePlacesApiKey,
-        // rating이 이미 Enterprise 등급을 부르므로 priceLevel·photos·formattedAddress(Pro)는 등급을
-        // 더 올리지 않는다. 사진은 여기서 이름만 받고(무료), 실제 이미지 해석은 추천된 1곳만 처리한다.
-        'X-Goog-FieldMask':
-          'places.id,places.displayName,places.primaryType,places.primaryTypeDisplayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.priceLevel,places.photos',
-      },
-      body: JSON.stringify({
-        // languageCode가 없으면 displayName과 primaryTypeDisplayName이 영문으로 온다.
-        languageCode: 'ko',
-        regionCode: 'KR',
-        maxResultCount: 20,
-        locationRestriction: {
-          circle: { center: { latitude: lat, longitude: lng }, radius },
-        },
-        includedTypes: ['restaurant'],
-      }),
-    });
-    if (!response.ok) throw new Error(`Google Places API 오류: ${response.status}`);
-    let json: any;
-    try {
-      json = await response.json();
-    } catch {
-      throw new Error('Google Places API 응답을 파싱할 수 없습니다.');
+    const restaurants: NearbyRestaurant[] = [];
+    for (let page = 1; page <= KAKAO_MAX_PAGES; page++) {
+      const url = new URL('https://dapi.kakao.com/v2/local/search/category.json');
+      url.searchParams.set('category_group_code', KAKAO_CATEGORY_GROUP_FOOD);
+      // 카카오는 x가 경도, y가 위도다(LatLng 순서와 반대).
+      url.searchParams.set('x', String(lng));
+      url.searchParams.set('y', String(lat));
+      url.searchParams.set('radius', String(radius));
+      url.searchParams.set('sort', 'distance');
+      url.searchParams.set('size', String(KAKAO_PAGE_SIZE));
+      url.searchParams.set('page', String(page));
+      // REST API 키는 이 함수 밖으로 나가지 않는다(브라우저에 노출하면 도메인 제한이 없어 남용된다).
+      const response = await fetch(url, {
+        headers: { Authorization: `KakaoAK ${kakaoRestApiKey}` },
+      });
+      if (!response.ok) throw new Error(`카카오 로컬 API 오류: ${response.status}`);
+      let json: any;
+      try {
+        json = await response.json();
+      } catch {
+        throw new Error('카카오 로컬 API 응답을 파싱할 수 없습니다.');
+      }
+      const documents = json.documents ?? [];
+      for (const place of documents) {
+        const placeLat = Number(place.y);
+        const placeLng = Number(place.x);
+        restaurants.push({
+          placeId: place.id,
+          name: place.place_name ?? '',
+          ...splitCategoryName(place.category_name ?? ''),
+          address: place.road_address_name || place.address_name || null,
+          lat: placeLat,
+          lng: placeLng,
+          placeUrl: place.place_url ?? '',
+          distanceMeters: distanceMeters(lat, lng, placeLat, placeLng),
+        });
+      }
+      // 더 받을 것이 없으면 두 번째 호출을 아낀다.
+      if (json.meta?.is_end !== false || documents.length < KAKAO_PAGE_SIZE) break;
     }
-    const places = json.places ?? [];
-    return places.map((place: any) => ({
-      placeId: place.id,
-      name: place.displayName?.text ?? '',
-      category: place.primaryType ?? 'restaurant',
-      address: place.formattedAddress ?? null,
-      categoryLabel: place.primaryTypeDisplayName?.text ?? '기타',
-      lat: place.location?.latitude,
-      lng: place.location?.longitude,
-      googleRating: place.rating ?? null,
-      googleRatingsTotal: place.userRatingCount ?? 0,
-      priceLevel: place.priceLevel ?? null,
-      photoName: place.photos?.[0]?.name ?? null,
-      distanceMeters: distanceMeters(lat, lng, place.location?.latitude, place.location?.longitude),
-    }));
+    return restaurants;
   };
 }
 
@@ -155,7 +179,7 @@ function requireEnv(name: string): string {
 if (import.meta.main) {
   const supabaseUrl = requireEnv('SUPABASE_URL');
   const serviceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
-  const googlePlacesApiKey = requireEnv('GOOGLE_PLACES_API_KEY');
+  const kakaoRestApiKey = requireEnv('KAKAO_REST_API_KEY');
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   const usageStore = createUsageStore(supabase);
 
@@ -170,9 +194,7 @@ if (import.meta.main) {
       const cutoff = new Date(Date.now() - CACHE_TTL_MS).toISOString();
       const { data, error } = await supabase
         .from('restaurants')
-        .select(
-          'place_id,name,category,category_label,address,lat,lng,google_rating,google_ratings_total,price_level,photo_name,fetched_at',
-        )
+        .select('place_id,name,category,category_label,address,lat,lng,place_url,fetched_at')
         .gte('fetched_at', cutoff);
       if (error) throw error;
       return (data ?? [])
@@ -180,20 +202,17 @@ if (import.meta.main) {
           placeId: row.place_id,
           name: row.name,
           category: row.category,
-          // 라벨을 모르는 구버전 캐시 행은 기계값을 그대로 보여준다(15분 뒤 새 값으로 대체된다).
+          // 라벨을 모르는 구버전 캐시 행은 저장 키를 그대로 보여준다(15분 뒤 새 값으로 대체된다).
           categoryLabel: row.category_label ?? row.category,
           address: row.address ?? null,
           lat: row.lat,
           lng: row.lng,
-          googleRating: row.google_rating,
-          googleRatingsTotal: row.google_ratings_total,
-          priceLevel: row.price_level ?? null,
-          photoName: row.photo_name ?? null,
+          placeUrl: row.place_url ?? '',
           distanceMeters: distanceMeters(lat, lng, row.lat, row.lng),
         }))
         .filter((row) => row.distanceMeters <= radius);
     },
-    fetchGoogle: createGoogleFetcher(googlePlacesApiKey),
+    fetchKakao: createKakaoFetcher(kakaoRestApiKey),
     upsert: async (rows) => {
       if (!rows.length) return;
       const { error } = await supabase.from('restaurants').upsert(
@@ -205,10 +224,7 @@ if (import.meta.main) {
           address: row.address,
           lat: row.lat,
           lng: row.lng,
-          google_rating: row.googleRating,
-          google_ratings_total: row.googleRatingsTotal,
-          price_level: row.priceLevel,
-          photo_name: row.photoName,
+          place_url: row.placeUrl,
           fetched_at: new Date().toISOString(),
         })),
       );

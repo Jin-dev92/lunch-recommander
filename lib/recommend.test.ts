@@ -1,16 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { FOOD_CATEGORY } from './constants';
 import { filterCandidates, pickWeightedRandom, scoreCandidate, type Candidate } from './recommend';
 
 const base: Candidate = {
   placeId: 'a',
-  category: '한식',
+  category: FOOD_CATEGORY.KOREAN,
   distanceMeters: 100,
-  googleRating: 4,
-  googleRatingsTotal: 100,
   personalRating: null,
   snoozedUntil: null,
 };
-const criteria = { minGoogleRating: 3.5 as const, minGoogleReviews: 30 as const };
+const criteria = { category: FOOD_CATEGORY.ALL };
 
 describe('추천', () => {
   it('0점과 미래 스누즈를 제외하고 지난 스누즈를 포함합니다', () => {
@@ -22,20 +21,46 @@ describe('추천', () => {
     ];
     expect(filterCandidates(candidates, now, criteria).map((x) => x.placeId)).toEqual(['past']);
   });
-  it('Google 평점과 리뷰 수가 최소 기준 이상인 후보만 포함합니다', () => {
+  it('음식 종류를 고르면 그 카테고리 후보만 포함합니다', () => {
     const candidates = [
-      { ...base, placeId: 'boundary', googleRating: 3.5, googleRatingsTotal: 30 },
-      { ...base, placeId: 'low-rating', googleRating: 3.49, googleRatingsTotal: 30 },
-      { ...base, placeId: 'low-reviews', googleRating: 4, googleRatingsTotal: 29 },
-      { ...base, placeId: 'missing-rating', googleRating: null, googleRatingsTotal: 100 },
+      { ...base, placeId: 'korean', category: FOOD_CATEGORY.KOREAN },
+      { ...base, placeId: 'chinese', category: FOOD_CATEGORY.CHINESE },
+      // 카카오 2단계 카테고리는 열린 집합이라 상수 목록에 없는 값도 들어온다.
+      { ...base, placeId: 'unlisted', category: '퓨전요리' },
+    ];
+    expect(
+      filterCandidates(candidates, new Date(), { category: FOOD_CATEGORY.KOREAN }).map(
+        (x) => x.placeId,
+      ),
+    ).toEqual(['korean']);
+  });
+  it('전체를 고르면 상수 목록에 없는 카테고리도 남깁니다', () => {
+    const candidates = [
+      { ...base, placeId: 'korean', category: FOOD_CATEGORY.KOREAN },
+      { ...base, placeId: 'unlisted', category: '퓨전요리' },
     ];
     expect(filterCandidates(candidates, new Date(), criteria).map((x) => x.placeId)).toEqual([
-      'boundary',
+      'korean',
+      'unlisted',
     ]);
   });
-  it('결측 평점을 중립값으로 계산합니다', () => {
+  it('별점·선호 이력이 없으면 중립값으로 계산합니다', () => {
     expect(scoreCandidate(base, { categoryWeights: {}, maxDistanceMeters: 1000 })).toBeGreaterThan(
       0,
+    );
+  });
+  it('카테고리 선호와 개인 별점이 점수에 반영됩니다', () => {
+    const prefs = { categoryWeights: { [FOOD_CATEGORY.KOREAN]: 2 }, maxDistanceMeters: 1000 };
+    const neutral = scoreCandidate(base, { categoryWeights: {}, maxDistanceMeters: 1000 });
+    expect(scoreCandidate(base, prefs)).toBeCloseTo(neutral * 2);
+    expect(scoreCandidate({ ...base, personalRating: 5 }, prefs)).toBeGreaterThan(
+      scoreCandidate(base, prefs),
+    );
+  });
+  it('가까운 후보가 먼 후보보다 높은 점수를 받습니다', () => {
+    const prefs = { categoryWeights: {}, maxDistanceMeters: 1000 };
+    expect(scoreCandidate({ ...base, distanceMeters: 50 }, prefs)).toBeGreaterThan(
+      scoreCandidate({ ...base, distanceMeters: 900 }, prefs),
     );
   });
   it('결정적 rng에서 높은 가중치가 더 자주 선택됩니다', () => {

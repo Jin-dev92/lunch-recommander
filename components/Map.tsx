@@ -7,15 +7,22 @@ import Tooltip from '@mui/material/Tooltip';
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import {
   DEFAULT_RECOMMENDATION_CRITERIA,
-  type MinimumGoogleRating,
-  type MinimumGoogleReviews,
   type RecommendationCriteria,
   type SearchLocation,
 } from '../lib/types/api';
+import { FOOD_CATEGORY_OPTIONS, type FoodCategory } from '../lib/constants';
 import { MESSAGES } from '../lib/messages';
 import { useGeocode } from '../lib/hooks/mutations';
 import { errorMessage } from '../lib/messages';
-import { MAPS_SCRIPT_SRC, waitForMapsSdk } from '../lib/googleMaps';
+import {
+  KAKAO_MAP_LEVEL,
+  KAKAO_MAP_SCRIPT_SRC,
+  loadKakaoMaps,
+  type KakaoLatLng,
+  type KakaoMap,
+  type KakaoMarker,
+  type KakaoMaps,
+} from '../lib/kakaoMaps';
 import styles from './Map.module.css';
 import Spinner from './Spinner';
 
@@ -33,16 +40,13 @@ export default function Map({
 }) {
   const node = useRef<HTMLDivElement>(null);
   // 지도 인스턴스는 최초 1회만 만든다. 이 ref가 "이미 생성됨" 표시 역할도 한다.
-  const mapRef = useRef<google.maps.Map | null>(null);
-  const markerRef = useRef<google.maps.Marker | null>(null);
+  const mapRef = useRef<KakaoMap | null>(null);
+  const markerRef = useRef<KakaoMarker | null>(null);
+  // 좌표가 바뀔 때 LatLng를 새로 만들어야 하므로 SDK 네임스페이스를 들고 있는다.
+  const mapsRef = useRef<KakaoMaps | null>(null);
   const [sdkReady, setSdkReady] = useState(false);
   const [radius, setRadius] = useState<SearchLocation['radius']>(500);
-  const [minGoogleRating, setMinGoogleRating] = useState<MinimumGoogleRating>(
-    DEFAULT_RECOMMENDATION_CRITERIA.minGoogleRating,
-  );
-  const [minGoogleReviews, setMinGoogleReviews] = useState<MinimumGoogleReviews>(
-    DEFAULT_RECOMMENDATION_CRITERIA.minGoogleReviews,
-  );
+  const [category, setCategory] = useState<FoodCategory>(DEFAULT_RECOMMENDATION_CRITERIA.category);
   const [coords, setCoords] = useState<Coords | null>(null);
   const [error, setError] = useState('');
   const [isLocating, setIsLocating] = useState(false);
@@ -110,39 +114,35 @@ export default function Map({
     let cancelled = false;
 
     (async () => {
-      // loading=async는 스크립트 태그의 준비 이벤트와 importLibrary 노출 시점이
-      // 다를 수 있으므로, SDK 전역이 실제로 준비될 때까지 기다린다.
-      const maps = await waitForMapsSdk();
-      // Marker는 maps가 아니라 marker 라이브러리 소속이므로 함께 요청한다.
-      const [{ Map: GoogleMap }, { Marker }] = await Promise.all([
-        maps.importLibrary('maps') as Promise<google.maps.MapsLibrary>,
-        maps.importLibrary('marker') as Promise<google.maps.MarkerLibrary>,
-      ]);
-      // 라이브러리를 기다리는 사이 언마운트됐거나 다른 경로로 이미 만들어졌으면 중단한다.
+      // autoload=false로 불러온 SDK는 kakao.maps.load 콜백이 초기화 완료를 알려준다.
+      const maps = await loadKakaoMaps();
+      // 초기화를 기다리는 사이 언마운트됐거나 다른 경로로 이미 만들어졌으면 중단한다.
       if (cancelled || mapRef.current || !node.current) return;
 
-      const initialCenter = coords ?? DEFAULT_MAP_CENTER;
-      const map = new GoogleMap(node.current, {
+      const center = coords ?? DEFAULT_MAP_CENTER;
+      const initialCenter = new maps.LatLng(center.lat, center.lng);
+      const map = new maps.Map(node.current, {
         center: initialCenter,
-        zoom: coords ? 16 : 13,
-        mapTypeControl: false,
+        level: coords ? KAKAO_MAP_LEVEL.PINPOINT : KAKAO_MAP_LEVEL.CITY,
       });
       // 고정밀 측위도 실내나 데스크톱에서는 빗나가므로 사용자가 직접 보정할 수 있어야 한다.
-      const marker = new Marker({
+      const marker = new maps.Marker({
         position: initialCenter,
-        map,
         draggable: true,
         title: MESSAGES.MAP_ADJUST_HINT,
-        visible: Boolean(coords),
       });
-      const moveTo = (latLng: google.maps.LatLng | null) => {
-        if (!latLng) return;
+      // 카카오 마커에는 setVisible이 없다. 좌표를 모르는 동안에는 지도에 붙이지 않는다.
+      if (coords) marker.setMap(map);
+
+      const moveTo = (latLng: KakaoLatLng) => {
         marker.setPosition(latLng);
-        marker.setVisible(true);
-        setCoords({ lat: latLng.lat(), lng: latLng.lng() });
+        marker.setMap(map);
+        setCoords({ lat: latLng.getLat(), lng: latLng.getLng() });
       };
-      marker.addListener('dragend', (event: google.maps.MapMouseEvent) => moveTo(event.latLng));
-      map.addListener('click', (event: google.maps.MapMouseEvent) => moveTo(event.latLng));
+      // 마커 dragend 콜백은 인자를 받지 않으므로 새 좌표를 마커에서 직접 읽는다.
+      maps.event.addListener(marker, 'dragend', () => moveTo(marker.getPosition()));
+      maps.event.addListener(map, 'click', (event) => moveTo(event.latLng));
+      mapsRef.current = maps;
       mapRef.current = map;
       markerRef.current = marker;
     })().catch(() => {
@@ -155,17 +155,19 @@ export default function Map({
   }, [coords, sdkReady]);
 
   useEffect(() => {
-    if (!coords || !mapRef.current || !markerRef.current) return;
-    mapRef.current.setCenter(coords);
-    mapRef.current.setZoom(16);
-    markerRef.current.setPosition(coords);
-    markerRef.current.setVisible(true);
+    const maps = mapsRef.current;
+    if (!coords || !maps || !mapRef.current || !markerRef.current) return;
+    const latLng = new maps.LatLng(coords.lat, coords.lng);
+    mapRef.current.setCenter(latLng);
+    mapRef.current.setLevel(KAKAO_MAP_LEVEL.PINPOINT);
+    markerRef.current.setPosition(latLng);
+    markerRef.current.setMap(mapRef.current);
   }, [coords]);
 
   return (
     <section className={styles.section}>
       <Script
-        src={MAPS_SCRIPT_SRC}
+        src={KAKAO_MAP_SCRIPT_SRC}
         strategy="afterInteractive"
         onLoad={markSdkReady}
         onReady={markSdkReady}
@@ -211,38 +213,21 @@ export default function Map({
           </select>
         </label>
         <label className={styles.searchField}>
-          최소 평점
+          음식 종류
           <select
             className={styles.select}
-            value={minGoogleRating}
+            value={category}
             onChange={(e) => {
-              const value = Number(e.target.value) as MinimumGoogleRating;
-              setMinGoogleRating(value);
-              onCriteriaChange?.({ minGoogleRating: value, minGoogleReviews });
+              const value = e.target.value as FoodCategory;
+              setCategory(value);
+              onCriteriaChange?.({ category: value });
             }}
           >
-            <option value="3.5">평점 3.5 이상</option>
-            <option value="4">평점 4.0 이상</option>
-            <option value="4.5">평점 4.5 이상</option>
-            <option value="5">평점 5.0 이상</option>
-          </select>
-        </label>
-        <label className={styles.searchField}>
-          최소 리뷰 수
-          <select
-            className={styles.select}
-            value={minGoogleReviews}
-            onChange={(e) => {
-              const value = Number(e.target.value) as MinimumGoogleReviews;
-              setMinGoogleReviews(value);
-              onCriteriaChange?.({ minGoogleRating, minGoogleReviews: value });
-            }}
-          >
-            <option value="10">리뷰 10개 이상</option>
-            <option value="30">리뷰 30개 이상</option>
-            <option value="50">리뷰 50개 이상</option>
-            <option value="70">리뷰 70개 이상</option>
-            <option value="100">리뷰 100개 이상</option>
+            {FOOD_CATEGORY_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
           </select>
         </label>
       </div>

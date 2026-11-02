@@ -1,11 +1,10 @@
+import { FOOD_CATEGORY } from './constants';
 import type { RecommendationCriteria } from './types/api';
 
 export type Candidate = {
   placeId: string;
   category: string;
   distanceMeters: number;
-  googleRating: number | null;
-  googleRatingsTotal: number;
   personalRating: number | null;
   snoozedUntil: string | null;
 };
@@ -18,7 +17,6 @@ export type RecommendationPrefs = {
 const EXPONENTS = {
   category: 1,
   personal: 1,
-  google: 1,
   distance: 1,
 } as const;
 
@@ -32,24 +30,22 @@ export function filterCandidates<T extends Candidate>(
     (c) =>
       c.personalRating !== 0 &&
       (!c.snoozedUntil || new Date(c.snoozedUntil) <= now) &&
-      c.googleRating !== null &&
-      c.googleRating >= criteria.minGoogleRating &&
-      c.googleRatingsTotal >= criteria.minGoogleReviews,
+      // ALL은 음식 종류를 좁히지 않는다. 카카오 2단계 카테고리는 열린 집합이라
+      // 상수 목록에 없는 값도 들어오며, 기본값 ALL에서는 그런 후보도 남는다.
+      (criteria.category === FOOD_CATEGORY.ALL || c.category === criteria.category),
   );
 }
 
+/**
+ * 카카오 로컬 API에는 평점·리뷰 수가 없어 외부 평점 항이 없다. 사용자 자신의 취향 이력
+ * (카테고리 선호·개인 별점)과 거리만으로 점수를 낸다. 세 항 모두 1이 중립이다.
+ */
 export function scoreCandidate(candidate: Candidate, prefs: RecommendationPrefs): number {
   const category = prefs.categoryWeights[candidate.category] ?? 1;
   const personal = candidate.personalRating == null ? 1 : candidate.personalRating / 3;
-  const reviewConfidence = candidate.googleRatingsTotal / (candidate.googleRatingsTotal + 20);
-  const google =
-    candidate.googleRating == null ? 1 : 1 + (candidate.googleRating / 5 - 1) * reviewConfidence;
   const distance = 1 + 0.2 * Math.max(0, 1 - candidate.distanceMeters / prefs.maxDistanceMeters);
   return (
-    category ** EXPONENTS.category *
-    personal ** EXPONENTS.personal *
-    google ** EXPONENTS.google *
-    distance ** EXPONENTS.distance
+    category ** EXPONENTS.category * personal ** EXPONENTS.personal * distance ** EXPONENTS.distance
   );
 }
 

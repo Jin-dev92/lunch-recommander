@@ -1,7 +1,7 @@
 'use client';
 import Script from 'next/script';
 import { useEffect, useRef, useState } from 'react';
-import { displayAddress, googleMapsPlaceUrl } from '../lib/constants';
+import { kakaoMapSearchUrl } from '../lib/constants';
 import {
   useAddSavedPlace,
   useDeleteSavedPlace,
@@ -10,7 +10,13 @@ import {
 } from '../lib/hooks/mutations';
 import { useSavedPlaces } from '../lib/hooks/queries';
 import { errorMessage, MESSAGES } from '../lib/messages';
-import { MAPS_SCRIPT_SRC, waitForMapsSdk } from '../lib/googleMaps';
+import {
+  KAKAO_MAP_LEVEL,
+  KAKAO_MAP_SCRIPT_SRC,
+  loadKakaoMaps,
+  type KakaoMap,
+  type KakaoMarker,
+} from '../lib/kakaoMaps';
 import styles from './SavedPlacesMap.module.css';
 
 type Coords = { lat: number; lng: number };
@@ -34,8 +40,8 @@ export default function SavedPlacesMap({
   const addSavedPlace = useAddSavedPlace();
 
   const mapNode = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const mapRef = useRef<KakaoMap | null>(null);
+  const markersRef = useRef<KakaoMarker[]>([]);
   const confirmDialog = useRef<HTMLDialogElement>(null);
 
   const [sdkReady, setSdkReady] = useState(false);
@@ -61,36 +67,32 @@ export default function SavedPlacesMap({
     let cancelled = false;
 
     (async () => {
-      const maps = await waitForMapsSdk();
-      const [{ Map: GoogleMap }, { Marker }] = await Promise.all([
-        maps.importLibrary('maps') as Promise<google.maps.MapsLibrary>,
-        maps.importLibrary('marker') as Promise<google.maps.MarkerLibrary>,
-      ]);
+      // autoload=false로 불러온 SDK는 kakao.maps.load 콜백이 초기화 완료를 알려준다.
+      const maps = await loadKakaoMaps();
       if (cancelled || !mapNode.current) return;
 
+      const first = places?.[0];
       if (!mapRef.current) {
-        const initialCenter = places?.[0] ? { lat: places[0].lat, lng: places[0].lng } : DEFAULT_MAP_CENTER;
-        mapRef.current = new GoogleMap(mapNode.current, {
-          center: initialCenter,
-          zoom: 14,
-          mapTypeControl: false,
+        const center = first ?? DEFAULT_MAP_CENTER;
+        mapRef.current = new maps.Map(mapNode.current, {
+          center: new maps.LatLng(center.lat, center.lng),
+          level: KAKAO_MAP_LEVEL.CITY,
         });
       }
+      const map = mapRef.current;
 
       markersRef.current.forEach((marker) => marker.setMap(null));
       markersRef.current = (places ?? []).map((place) => {
-        const marker = new Marker({
-          position: { lat: place.lat, lng: place.lng },
-          map: mapRef.current!,
+        const marker = new maps.Marker({
+          position: new maps.LatLng(place.lat, place.lng),
+          map,
           title: place.name,
         });
-        marker.addListener('click', () => setSelectedId(place.id));
+        maps.event.addListener(marker, 'click', () => setSelectedId(place.id));
         return marker;
       });
 
-      if (places && places.length > 0) {
-        mapRef.current.setCenter({ lat: places[0].lat, lng: places[0].lng });
-      }
+      if (first) map.setCenter(new maps.LatLng(first.lat, first.lng));
     })().catch(() => {
       if (!cancelled) setMapError(MESSAGES.MAP_LOAD_FAILED);
     });
@@ -115,7 +117,7 @@ export default function SavedPlacesMap({
     });
   }
 
-  // Google placeId가 없으므로 좌표 기반 합성 키를 쓴다. 소수점 6자리로 고정해야
+  // 카카오 장소 식별자가 없으므로 좌표 기반 합성 키를 쓴다. 소수점 6자리로 고정해야
   // 같은 지점을 다시 검색해도 같은 placeId가 나와 unique(folder_id, place_id) 제약이
   // 중복을 흡수한다(upsert ignoreDuplicates는 useSavedPlacesMutations 쪽에서 처리).
   function searchAndAddPlace(event: React.FormEvent<HTMLFormElement>) {
@@ -144,7 +146,7 @@ export default function SavedPlacesMap({
   return (
     <section className={styles.section} aria-label="저장한 음식점 지도">
       <Script
-        src={MAPS_SCRIPT_SRC}
+        src={KAKAO_MAP_SCRIPT_SRC}
         strategy="afterInteractive"
         onLoad={() => setSdkReady(true)}
         onReady={() => setSdkReady(true)}
@@ -197,7 +199,9 @@ export default function SavedPlacesMap({
               <button
                 type="button"
                 className={
-                  place.id === selectedId ? `${styles.itemButton} ${styles.selected}` : styles.itemButton
+                  place.id === selectedId
+                    ? `${styles.itemButton} ${styles.selected}`
+                    : styles.itemButton
                 }
                 aria-pressed={place.id === selectedId}
                 onClick={() => setSelectedId(place.id)}
@@ -213,9 +217,7 @@ export default function SavedPlacesMap({
         <div className={styles.detail}>
           <div className={styles.detailHeader}>
             <h3 className={styles.detailName}>{selected.name}</h3>
-            {selected.address && (
-              <p className={styles.detailAddress}>{displayAddress(selected.address)}</p>
-            )}
+            {selected.address && <p className={styles.detailAddress}>{selected.address}</p>}
           </div>
 
           {canEdit ? (
@@ -245,11 +247,11 @@ export default function SavedPlacesMap({
           <div className={styles.detailFooter}>
             <a
               className={styles.detailLink}
-              href={googleMapsPlaceUrl(selected.name, selected.placeId)}
+              href={kakaoMapSearchUrl(selected.name)}
               target="_blank"
               rel="noopener noreferrer"
             >
-              {MESSAGES.GOOGLE_MAPS_DETAIL_LINK}
+              {MESSAGES.KAKAO_MAP_DETAIL_LINK}
             </a>
             {canEdit && (
               <button
