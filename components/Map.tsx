@@ -1,7 +1,6 @@
 'use client';
 
-import Script from 'next/script';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
@@ -14,20 +13,15 @@ import { FOOD_CATEGORY_OPTIONS, type FoodCategory } from '../lib/constants';
 import { MESSAGES } from '../lib/messages';
 import { useGeocode } from '../lib/hooks/mutations';
 import { errorMessage } from '../lib/messages';
-import {
-  KAKAO_MAP_LEVEL,
-  KAKAO_MAP_SCRIPT_SRC,
-  loadKakaoMaps,
-  type KakaoLatLng,
-  type KakaoMap,
-  type KakaoMarker,
-  type KakaoMaps,
-} from '../lib/kakaoMaps';
+import MapCanvas from './map/MapCanvas';
+import type { MapMarker } from './map/types';
 import styles from './Map.module.css';
 import Spinner from './Spinner';
 
 type Coords = { lat: number; lng: number };
 const DEFAULT_MAP_CENTER: Coords = { lat: 37.5665, lng: 126.978 };
+// 위치 보정용 핀은 항상 1개다. 캔버스가 마커를 id로 식별하므로 고정 id를 쓴다.
+const PIN_ID = 'search-location';
 
 export default function Map({
   onLocationChange,
@@ -38,20 +32,12 @@ export default function Map({
   onCriteriaChange?: (value: RecommendationCriteria) => void;
   onRefresh?: () => void;
 }) {
-  const node = useRef<HTMLDivElement>(null);
-  // 지도 인스턴스는 최초 1회만 만든다. 이 ref가 "이미 생성됨" 표시 역할도 한다.
-  const mapRef = useRef<KakaoMap | null>(null);
-  const markerRef = useRef<KakaoMarker | null>(null);
-  // 좌표가 바뀔 때 LatLng를 새로 만들어야 하므로 SDK 네임스페이스를 들고 있는다.
-  const mapsRef = useRef<KakaoMaps | null>(null);
-  const [sdkReady, setSdkReady] = useState(false);
   const [radius, setRadius] = useState<SearchLocation['radius']>(500);
   const [category, setCategory] = useState<FoodCategory>(DEFAULT_RECOMMENDATION_CRITERIA.category);
   const [coords, setCoords] = useState<Coords | null>(null);
   const [error, setError] = useState('');
   const [isLocating, setIsLocating] = useState(false);
   const refresh = onRefresh ?? (() => window.location.reload());
-  const markSdkReady = useCallback(() => setSdkReady(true), []);
   const geocode = useGeocode();
 
   // 주소 검색: 좌표로 변환되면 setCoords가 지도 중심·핀·검색 위치를 함께 옮긴다.
@@ -59,12 +45,17 @@ export default function Map({
     event.preventDefault();
     const address = String(new FormData(event.currentTarget).get('address') ?? '').trim();
     if (!address) return;
-    geocode.mutate(address, {
-      onSuccess: (coords) => {
-        setError('');
-        setCoords(coords);
+    geocode.mutate(
+      // 지오코딩은 검색어만 있고 좌표가 없는 시점이라 지역 판정을 쓸 수 없다.
+      // 현재 지도 중심을 함께 보내 서버가 provider를 고르게 한다.
+      { address, near: coords ?? DEFAULT_MAP_CENTER },
+      {
+        onSuccess: (coords) => {
+          setError('');
+          setCoords(coords);
+        },
       },
-    });
+    );
   }
 
   const requestLocation = useCallback(async (isRetry = false) => {
@@ -107,72 +98,32 @@ export default function Map({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coords?.lat, coords?.lng, radius]);
 
-  // SDK만 준비되면 기본 서울 지도를 먼저 만든다. 첫 방문자의 위치 권한 응답이 늦거나
-  // 실패해도 빈 영역으로 남지 않으며, 좌표가 준비되면 아래 effect가 중심과 핀을 옮긴다.
-  useEffect(() => {
-    if (!sdkReady || mapRef.current) return;
-    let cancelled = false;
+  // 좌표를 모르는 동안에는 핀을 그리지 않는다. 매 렌더마다 새 배열을 넘기면
+  // 캔버스가 마커를 지우고 다시 그리므로 원시값으로 메모한다.
+  const markers = useMemo<MapMarker[]>(
+    () =>
+      coords
+        ? [
+            {
+              id: PIN_ID,
+              lat: coords.lat,
+              lng: coords.lng,
+              draggable: true,
+              title: MESSAGES.MAP_ADJUST_HINT,
+            },
+          ]
+        : [],
+    // deps에 coords 객체를 넣으면 참조가 바뀔 때마다 새 배열이 나와 캔버스가 마커를 다시 그린다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [coords?.lat, coords?.lng],
+  );
 
-    (async () => {
-      // autoload=false로 불러온 SDK는 kakao.maps.load 콜백이 초기화 완료를 알려준다.
-      const maps = await loadKakaoMaps();
-      // 초기화를 기다리는 사이 언마운트됐거나 다른 경로로 이미 만들어졌으면 중단한다.
-      if (cancelled || mapRef.current || !node.current) return;
-
-      const center = coords ?? DEFAULT_MAP_CENTER;
-      const initialCenter = new maps.LatLng(center.lat, center.lng);
-      const map = new maps.Map(node.current, {
-        center: initialCenter,
-        level: coords ? KAKAO_MAP_LEVEL.PINPOINT : KAKAO_MAP_LEVEL.CITY,
-      });
-      // 고정밀 측위도 실내나 데스크톱에서는 빗나가므로 사용자가 직접 보정할 수 있어야 한다.
-      const marker = new maps.Marker({
-        position: initialCenter,
-        draggable: true,
-        title: MESSAGES.MAP_ADJUST_HINT,
-      });
-      // 카카오 마커에는 setVisible이 없다. 좌표를 모르는 동안에는 지도에 붙이지 않는다.
-      if (coords) marker.setMap(map);
-
-      const moveTo = (latLng: KakaoLatLng) => {
-        marker.setPosition(latLng);
-        marker.setMap(map);
-        setCoords({ lat: latLng.getLat(), lng: latLng.getLng() });
-      };
-      // 마커 dragend 콜백은 인자를 받지 않으므로 새 좌표를 마커에서 직접 읽는다.
-      maps.event.addListener(marker, 'dragend', () => moveTo(marker.getPosition()));
-      maps.event.addListener(map, 'click', (event) => moveTo(event.latLng));
-      mapsRef.current = maps;
-      mapRef.current = map;
-      markerRef.current = marker;
-    })().catch(() => {
-      if (!cancelled) setError(MESSAGES.MAP_LOAD_FAILED);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [coords, sdkReady]);
-
-  useEffect(() => {
-    const maps = mapsRef.current;
-    if (!coords || !maps || !mapRef.current || !markerRef.current) return;
-    const latLng = new maps.LatLng(coords.lat, coords.lng);
-    mapRef.current.setCenter(latLng);
-    mapRef.current.setLevel(KAKAO_MAP_LEVEL.PINPOINT);
-    markerRef.current.setPosition(latLng);
-    markerRef.current.setMap(mapRef.current);
-  }, [coords]);
+  // 고정밀 측위도 실내나 데스크톱에서는 빗나가므로 사용자가 직접 보정할 수 있어야 한다.
+  const moveTo = useCallback((lat: number, lng: number) => setCoords({ lat, lng }), []);
+  const onMapError = useCallback(() => setError(MESSAGES.MAP_LOAD_FAILED), []);
 
   return (
     <section className={styles.section}>
-      <Script
-        src={KAKAO_MAP_SCRIPT_SRC}
-        strategy="afterInteractive"
-        onLoad={markSdkReady}
-        onReady={markSdkReady}
-        onError={() => setError(MESSAGES.MAP_LOAD_FAILED)}
-      />
       <form className={styles.addressSearch} onSubmit={searchAddress}>
         <input
           className={styles.addressInput}
@@ -232,7 +183,16 @@ export default function Map({
         </label>
       </div>
       <div className={styles.mapContainer}>
-        <div className={styles.map} ref={node} aria-label="주변 지도" />
+        <MapCanvas
+          center={coords ?? DEFAULT_MAP_CENTER}
+          zoomLevel={coords ? 'pinpoint' : 'city'}
+          markers={markers}
+          onMapClick={moveTo}
+          onMarkerDragEnd={(_id, lat, lng) => moveTo(lat, lng)}
+          onError={onMapError}
+          className={styles.map}
+          ariaLabel="주변 지도"
+        />
         <Tooltip title="지도 새로고침" placement="top">
           <IconButton
             className={styles.refreshButton}

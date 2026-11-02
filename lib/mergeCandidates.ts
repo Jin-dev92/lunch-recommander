@@ -14,6 +14,7 @@ export function mergeCandidates(
     lat: number;
     lng: number;
     placeUrl: string;
+    priceLevel: string | null;
   })[];
   categoryWeights: Record<string, number>;
 } {

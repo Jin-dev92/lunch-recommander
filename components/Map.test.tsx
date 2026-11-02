@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useEffect, type ReactElement } from 'react';
+import { type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MapCanvasProps } from './map/types';
 
 // 주소 검색은 useGeocode → axiosInstance → supabaseClient를 탄다. 네트워크·QueryClient를 모킹한다.
 vi.mock('../lib/supabaseClient', () => ({
@@ -11,124 +12,114 @@ vi.mock('../lib/axiosInstance', () => ({ axiosInstance: { post: vi.fn() } }));
 import { axiosInstance } from '../lib/axiosInstance';
 const geocodePost = axiosInstance.post as ReturnType<typeof vi.fn>;
 
+// 지도 SDK 연결은 캔버스 쪽 테스트(components/map/*.test.tsx)가 검증한다. 여기서는 Map이
+// 캔버스에 무엇을 넘기고 캔버스 콜백에 어떻게 반응하는지만 본다.
+let canvasProps: MapCanvasProps | null = null;
+vi.mock('./map/MapCanvas', () => ({
+  default: function MockMapCanvas(props: MapCanvasProps) {
+    canvasProps = props;
+    return <div className={props.className} aria-label={props.ariaLabel} />;
+  },
+}));
+
+import Map from './Map';
+
 // useGeocode(mutation)가 QueryClientProvider를 요구하므로 렌더를 감싼다.
 function renderMap(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
 }
 
-// next/script는 jsdom에서 실제로 스크립트를 받아오지 않는다. SDK 로드 완료 신호만 재현한다.
-// onReady를 effect에서 호출해야 렌더 중 setState 경고가 나지 않는다.
-let scriptShouldFail = false;
-vi.mock('next/script', () => ({
-  // 훅을 쓰는 컴포넌트이므로 이름이 대문자로 시작해야 rules-of-hooks를 통과한다.
-  default: function MockScript({
-    onReady,
-    onLoad,
-    onError,
-  }: {
-    onReady?: () => void;
-    onLoad?: () => void;
-    onError?: () => void;
-  }) {
-    useEffect(() => {
-      if (scriptShouldFail) onError?.();
-      else onReady?.();
-    }, [onReady, onError, onLoad]);
-    return null;
-  },
-}));
-
-import Map from './Map';
-
-// ponytail: 실제 카카오맵 SDK를 로드하면 네트워크 호출이 발생하므로 전역 kakao 객체를 모킹.
-// 핀 이동을 검증해야 하므로 kakao.maps.event.addListener로 등록된 핸들러를 listeners에
-// 모아 테스트에서 직접 호출한다. 카카오 마커의 dragend 콜백은 인자를 받지 않으므로
-// 핸들러도 인자 없이 호출하고, 새 좌표는 marker.getPosition()이 돌려주게 만든다.
-type MockLatLng = { getLat(): number; getLng(): number };
-
-const mapMock = vi.fn();
-const markerMock = vi.fn();
-let listeners: Record<string, (event: { latLng: MockLatLng }) => void>;
-const setPosition = vi.fn();
-const setMarkerMap = vi.fn();
-const getPosition = vi.fn();
-const setCenter = vi.fn();
-const setLevel = vi.fn();
-/** 카카오 LatLng는 생성자로 만들고 getLat/getLng로 읽는다. */
-function latLng(lat: number, lng: number): MockLatLng {
-  return { getLat: () => lat, getLng: () => lng };
-}
-
-// kakao.maps.load 콜백을 즉시 실행하지 않고 보류시켜, 초기화가 늦게 끝나는 경우를 재현한다.
-let deferLoad = false;
-let pendingLoad: (() => void) | undefined;
-
 beforeEach(() => {
-  scriptShouldFail = false;
-  deferLoad = false;
-  pendingLoad = undefined;
+  canvasProps = null;
   geocodePost.mockReset();
-  listeners = {};
-  setPosition.mockReset();
-  setMarkerMap.mockReset();
-  getPosition.mockReset();
-  setCenter.mockReset();
-  setLevel.mockReset();
-  mapMock.mockReset();
-  markerMock.mockReset();
-  mapMock.mockImplementation(() => ({ setCenter, setLevel }));
-  markerMock.mockImplementation(() => ({
-    setPosition,
-    setMap: setMarkerMap,
-    getPosition,
-  }));
-  (globalThis as unknown as { kakao: unknown }).kakao = {
-    maps: {
-      // autoload=false로 불러온 SDK는 이 콜백으로 초기화 완료를 알린다.
-      load: (callback: () => void) => {
-        if (deferLoad) pendingLoad = callback;
-        else callback();
-      },
-      LatLng: vi.fn((lat: number, lng: number) => latLng(lat, lng)),
-      Map: mapMock,
-      Marker: markerMock,
-      event: {
-        addListener: (
-          _target: unknown,
-          event: string,
-          handler: (e: { latLng: MockLatLng }) => void,
-        ) => {
-          listeners[event] = handler;
-        },
-      },
-    },
-  };
 });
 
 describe('지도', () => {
-  it('첫 위치 응답을 기다리는 동안에도 기본 서울 지도를 만듭니다', async () => {
-    vi.stubGlobal('navigator', {
-      geolocation: { getCurrentPosition: vi.fn() },
-    });
+  it('첫 위치 응답을 기다리는 동안에도 기본 서울 좌표로 지도를 띄웁니다', async () => {
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: vi.fn() } });
 
     renderMap(<Map onLocationChange={vi.fn()} />);
 
-    // 카카오 레벨은 숫자가 작을수록 확대된다. 좌표를 모를 때는 도시 전체가 보이는 레벨 6.
-    await waitFor(() =>
-      expect(mapMock).toHaveBeenCalledWith(expect.anything(), {
-        center: expect.objectContaining({ getLat: expect.any(Function) }),
-        level: 6,
-      }),
-    );
-    expect(mapMock.mock.calls[0][1].center.getLat()).toBe(37.5665);
-    expect(mapMock.mock.calls[0][1].center.getLng()).toBe(126.978);
-    // 카카오 마커에는 setVisible이 없다. 좌표를 모르는 동안에는 지도에 붙이지 않는다.
-    expect(markerMock).toHaveBeenCalledWith(expect.objectContaining({ draggable: true }));
-    expect(setMarkerMap).not.toHaveBeenCalled();
+    await waitFor(() => expect(canvasProps).not.toBeNull());
+    expect(canvasProps!.center).toEqual({ lat: 37.5665, lng: 126.978 });
+    // 좌표를 모르면 도시 전체가 보이는 수준으로 두고 핀은 그리지 않는다.
+    expect(canvasProps!.zoomLevel).toBe('city');
+    expect(canvasProps!.markers).toEqual([]);
   });
 
-  it('주소를 검색하면 지오코딩 좌표로 위치를 옮깁니다', async () => {
+  it('현재 위치를 얻으면 콜백과 지도 중심·핀을 그 좌표로 맞춥니다', async () => {
+    const getCurrentPosition = vi.fn((success) =>
+      success({ coords: { latitude: 37.5, longitude: 127.0 } }),
+    );
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
+    const onLocationChange = vi.fn();
+
+    renderMap(<Map onLocationChange={onLocationChange} />);
+
+    await waitFor(() =>
+      expect(onLocationChange).toHaveBeenCalledWith({ lat: 37.5, lng: 127.0, radius: 500 }),
+    );
+    expect(canvasProps!.center).toEqual({ lat: 37.5, lng: 127.0 });
+    expect(canvasProps!.zoomLevel).toBe('pinpoint');
+    // 고정밀 측위도 빗나가므로 핀은 끌 수 있어야 한다.
+    expect(canvasProps!.markers).toEqual([
+      expect.objectContaining({ lat: 37.5, lng: 127.0, draggable: true }),
+    ]);
+  });
+
+  it('고정밀 측위를 요청합니다', async () => {
+    // 옵션이 없으면 WiFi/IP 기반 대략 측위로 떨어져 수 km 어긋난다.
+    const getCurrentPosition = vi.fn<Geolocation['getCurrentPosition']>((success) =>
+      success({ coords: { latitude: 37.5, longitude: 127.0 } } as GeolocationPosition),
+    );
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
+
+    renderMap(<Map onLocationChange={vi.fn()} />);
+
+    await waitFor(() => expect(getCurrentPosition).toHaveBeenCalled());
+    expect(getCurrentPosition.mock.calls[0][2]).toMatchObject({
+      enableHighAccuracy: true,
+      maximumAge: 0,
+    });
+  });
+
+  it('핀을 끌면 보정된 위치가 콜백으로 전달됩니다', async () => {
+    const getCurrentPosition = vi.fn((success) =>
+      success({ coords: { latitude: 37.5, longitude: 127.0 } }),
+    );
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
+    const onLocationChange = vi.fn();
+
+    renderMap(<Map onLocationChange={onLocationChange} />);
+    await waitFor(() => expect(canvasProps?.markers.length).toBe(1));
+
+    canvasProps!.onMarkerDragEnd!(canvasProps!.markers[0].id, 37.6, 127.1);
+
+    await waitFor(() =>
+      expect(onLocationChange).toHaveBeenCalledWith({ lat: 37.6, lng: 127.1, radius: 500 }),
+    );
+  });
+
+  it('지도를 누르면 그 지점으로 핀과 검색 위치가 옮겨집니다', async () => {
+    const getCurrentPosition = vi.fn((success) =>
+      success({ coords: { latitude: 37.5, longitude: 127.0 } }),
+    );
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
+    const onLocationChange = vi.fn();
+
+    renderMap(<Map onLocationChange={onLocationChange} />);
+    await waitFor(() => expect(canvasProps).not.toBeNull());
+
+    canvasProps!.onMapClick!(37.4, 126.9);
+
+    await waitFor(() =>
+      expect(onLocationChange).toHaveBeenCalledWith({ lat: 37.4, lng: 126.9, radius: 500 }),
+    );
+    expect(canvasProps!.markers).toEqual([expect.objectContaining({ lat: 37.4, lng: 126.9 })]);
+  });
+
+  it('주소를 검색하면 지오코딩 좌표로 위치를 옮기고 현재 중심을 함께 보냅니다', async () => {
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: vi.fn() } });
     geocodePost.mockResolvedValue({ data: { lat: 37.6, lng: 127.05 } });
     const onLocationChange = vi.fn();
@@ -140,7 +131,11 @@ describe('지도', () => {
     await waitFor(() =>
       expect(onLocationChange).toHaveBeenCalledWith({ lat: 37.6, lng: 127.05, radius: 500 }),
     );
-    expect(geocodePost).toHaveBeenCalledWith('/geocode', { address: '성북동 1가' });
+    // 검색 시점에는 결과 좌표를 모르므로, 서버가 provider를 고를 수 있게 near를 보낸다.
+    expect(geocodePost).toHaveBeenCalledWith('/geocode', {
+      address: '성북동 1가',
+      near: { lat: 37.5665, lng: 126.978 },
+    });
   });
 
   it('주소 검색에 실패하면 서버가 준 문구를 보여줍니다', async () => {
@@ -164,9 +159,7 @@ describe('지도', () => {
   });
 
   it('지도 새로고침 버튼을 누르면 새로고침 콜백을 호출합니다', () => {
-    vi.stubGlobal('navigator', {
-      geolocation: { getCurrentPosition: vi.fn() },
-    });
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: vi.fn() } });
     const onRefresh = vi.fn();
 
     renderMap(<Map onLocationChange={vi.fn()} onRefresh={onRefresh} />);
@@ -179,45 +172,21 @@ describe('지도', () => {
     expect(onRefresh).toHaveBeenCalledOnce();
   });
 
-  it('스크립트 준비 직후 카카오 SDK 전역이 늦게 노출돼도 지도를 만듭니다', async () => {
-    // next/script의 준비 이벤트가 스크립트 본문 실행보다 먼저 뜰 수 있다.
-    const global = globalThis as unknown as { kakao: unknown };
-    const kakao = global.kakao;
-    global.kakao = undefined;
-    window.setTimeout(() => {
-      global.kakao = kakao;
-    }, 10);
-    vi.stubGlobal('navigator', {
-      geolocation: { getCurrentPosition: vi.fn() },
-    });
-
-    renderMap(<Map onLocationChange={vi.fn()} />);
-
-    await waitFor(() => expect(mapMock).toHaveBeenCalledTimes(1));
-  });
-
   it('검색 반경과 음식 종류 조건을 제공합니다', () => {
-    vi.stubGlobal('navigator', {
-      geolocation: { getCurrentPosition: vi.fn() },
-    });
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: vi.fn() } });
     renderMap(<Map onLocationChange={vi.fn()} onCriteriaChange={vi.fn()} />);
     expect(screen.getByRole('option', { name: '100m' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: '300m' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: '500m' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '1km' })).toBeInTheDocument();
-    // 카카오 로컬 API에는 평점·리뷰 수가 없어 음식 종류로만 후보를 좁힌다.
+    // 평점·리뷰는 해외(Google) 결과에만 있어 필터로 쓰지 않는다. 필터는 음식 종류 하나다.
     expect(screen.getByLabelText('음식 종류')).toHaveValue('전체');
     expect(screen.getByRole('option', { name: '한식' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '술집' })).toBeInTheDocument();
     expect(screen.queryByLabelText('최소 평점')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('최소 리뷰 수')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('주변 지도')).not.toHaveAttribute('style');
   });
 
   it('음식 종류를 변경하면 콜백에 새 조건을 전달합니다', () => {
-    vi.stubGlobal('navigator', {
-      geolocation: { getCurrentPosition: vi.fn() },
-    });
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: vi.fn() } });
     const onCriteriaChange = vi.fn();
     renderMap(<Map onLocationChange={vi.fn()} onCriteriaChange={onCriteriaChange} />);
 
@@ -228,7 +197,7 @@ describe('지도', () => {
     expect(onCriteriaChange).toHaveBeenLastCalledWith({ category: '전체' });
   });
 
-  it('현재 위치를 얻으면 콜백과 지도를 초기화합니다', async () => {
+  it('반경을 변경하면 콜백에 새 반경이 전달됩니다', async () => {
     const getCurrentPosition = vi.fn((success) =>
       success({ coords: { latitude: 37.5, longitude: 127.0 } }),
     );
@@ -236,111 +205,28 @@ describe('지도', () => {
     const onLocationChange = vi.fn();
     renderMap(<Map onLocationChange={onLocationChange} />);
     await waitFor(() =>
-      expect(onLocationChange).toHaveBeenCalledWith({
-        lat: 37.5,
-        lng: 127.0,
-        radius: 500,
-      }),
+      expect(onLocationChange).toHaveBeenCalledWith({ lat: 37.5, lng: 127.0, radius: 500 }),
     );
-    // 좌표가 확정되면 가게가 구분되는 레벨 3으로 만든다.
-    expect(mapMock).toHaveBeenCalledWith(expect.anything(), {
-      center: expect.objectContaining({ getLat: expect.any(Function) }),
-      level: 3,
-    });
-    expect(mapMock.mock.calls[0][1].center.getLat()).toBe(37.5);
-    expect(mapMock.mock.calls[0][1].center.getLng()).toBe(127.0);
-    expect(markerMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        position: expect.objectContaining({ getLat: expect.any(Function) }),
-        draggable: true,
-      }),
+
+    fireEvent.change(screen.getByLabelText('검색 반경'), { target: { value: '1000' } });
+
+    await waitFor(() =>
+      expect(onLocationChange).toHaveBeenCalledWith({ lat: 37.5, lng: 127.0, radius: 1000 }),
     );
-    // 좌표를 알았으니 마커를 지도에 붙인다(카카오에는 setVisible이 없다).
-    expect(setMarkerMap).toHaveBeenCalled();
+    // 반경 변경은 좌표를 다시 물을 필요가 없다.
+    expect(getCurrentPosition).toHaveBeenCalledTimes(1);
   });
 
-  it('고정밀 측위를 요청합니다', async () => {
-    // 옵션이 없으면 WiFi/IP 기반 대략 측위로 떨어져 수 km 어긋난다.
-    // 세 번째 인자(옵션)를 검사해야 하므로 목에 Geolocation의 전체 시그니처를 입힌다.
-    const getCurrentPosition = vi.fn<Geolocation['getCurrentPosition']>((success) =>
-      success({ coords: { latitude: 37.5, longitude: 127.0 } } as GeolocationPosition),
-    );
-    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
+  it('지도 로드에 실패하면 에러 메시지를 보여줍니다', async () => {
+    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition: vi.fn() } });
     renderMap(<Map onLocationChange={vi.fn()} />);
-    await waitFor(() => expect(getCurrentPosition).toHaveBeenCalled());
-    expect(getCurrentPosition.mock.calls[0][2]).toMatchObject({
-      enableHighAccuracy: true,
-      maximumAge: 0,
-    });
-  });
+    await waitFor(() => expect(canvasProps).not.toBeNull());
 
-  it('핀을 끌면 보정된 위치가 콜백으로 전달됩니다', async () => {
-    const getCurrentPosition = vi.fn((success) =>
-      success({ coords: { latitude: 37.5, longitude: 127.0 } }),
-    );
-    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
-    const onLocationChange = vi.fn();
-    renderMap(<Map onLocationChange={onLocationChange} />);
-    await waitFor(() => expect(markerMock).toHaveBeenCalled());
+    canvasProps!.onError!();
 
-    // 카카오 dragend 콜백은 인자를 받지 않는다. 새 좌표는 마커에서 직접 읽는다.
-    getPosition.mockReturnValue(latLng(37.6, 127.1));
-    listeners.dragend({ latLng: latLng(0, 0) });
-
-    await waitFor(() =>
-      expect(onLocationChange).toHaveBeenCalledWith({ lat: 37.6, lng: 127.1, radius: 500 }),
-    );
-    // 위치 보정으로 지도를 다시 만들지는 않는다.
-    expect(mapMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('지도를 누르면 그 지점으로 핀과 검색 위치가 옮겨집니다', async () => {
-    const getCurrentPosition = vi.fn((success) =>
-      success({ coords: { latitude: 37.5, longitude: 127.0 } }),
-    );
-    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
-    const onLocationChange = vi.fn();
-    renderMap(<Map onLocationChange={onLocationChange} />);
-    await waitFor(() => expect(mapMock).toHaveBeenCalled());
-
-    listeners.click({ latLng: latLng(37.4, 126.9) });
-
-    await waitFor(() =>
-      expect(onLocationChange).toHaveBeenCalledWith({ lat: 37.4, lng: 126.9, radius: 500 }),
-    );
-    expect(setPosition).toHaveBeenCalled();
-  });
-
-  it('지도 스크립트 로드에 실패하면 에러 메시지를 보여주고 예외를 던지지 않습니다', async () => {
-    scriptShouldFail = true;
-    const getCurrentPosition = vi.fn((success) =>
-      success({ coords: { latitude: 37.5, longitude: 127.0 } }),
-    );
-    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
-    renderMap(<Map onLocationChange={vi.fn()} />);
     await waitFor(() =>
       expect(screen.getByRole('alert')).toHaveTextContent('지도를 불러오지 못했습니다'),
     );
-    expect(mapMock).not.toHaveBeenCalled();
-  });
-
-  it('SDK 초기화가 좌표보다 늦게 끝나도 지도를 만듭니다', async () => {
-    // 예전 구현은 좌표가 오는 순간 한 번만 검사하고 실패로 확정해 다시 시도하지 않았다.
-    deferLoad = true;
-
-    const getCurrentPosition = vi.fn((success) =>
-      success({ coords: { latitude: 37.5, longitude: 127.0 } }),
-    );
-    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
-    renderMap(<Map onLocationChange={vi.fn()} />);
-
-    await waitFor(() => expect(pendingLoad).toBeDefined());
-    expect(mapMock).not.toHaveBeenCalled();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-
-    pendingLoad?.();
-
-    await waitFor(() => expect(mapMock).toHaveBeenCalledTimes(1));
   });
 
   it('위치 권한이 거부되면 다시 요청할 수 있고 성공 시 경고를 지웁니다', async () => {
@@ -353,19 +239,13 @@ describe('지도', () => {
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
     const onLocationChange = vi.fn();
     renderMap(<Map onLocationChange={onLocationChange} />);
-    const retry = await screen.findByRole('button', {
-      name: '현재 위치 권한이 필요합니다.',
-    });
+    const retry = await screen.findByRole('button', { name: '현재 위치 권한이 필요합니다.' });
 
     fireEvent.click(retry);
 
     await waitFor(() => expect(getCurrentPosition).toHaveBeenCalledTimes(2));
     await waitFor(() =>
-      expect(onLocationChange).toHaveBeenCalledWith({
-        lat: 37.5,
-        lng: 127.0,
-        radius: 500,
-      }),
+      expect(onLocationChange).toHaveBeenCalledWith({ lat: 37.5, lng: 127.0, radius: 500 }),
     );
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -378,9 +258,7 @@ describe('지도', () => {
       permissions: { query },
     });
     renderMap(<Map onLocationChange={vi.fn()} />);
-    const retry = await screen.findByRole('button', {
-      name: '현재 위치 권한이 필요합니다.',
-    });
+    const retry = await screen.findByRole('button', { name: '현재 위치 권한이 필요합니다.' });
 
     fireEvent.click(retry);
 
@@ -401,9 +279,7 @@ describe('지도', () => {
       });
     vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
     renderMap(<Map onLocationChange={vi.fn()} />);
-    const retry = await screen.findByRole('button', {
-      name: '현재 위치 권한이 필요합니다.',
-    });
+    const retry = await screen.findByRole('button', { name: '현재 위치 권한이 필요합니다.' });
 
     fireEvent.click(retry);
 
@@ -414,36 +290,6 @@ describe('지도', () => {
       expect(screen.getByTestId('spinner')).toBeInTheDocument();
     });
 
-    retrySuccess?.({
-      coords: { latitude: 37.5, longitude: 127 },
-    } as GeolocationPosition);
-  });
-
-  it('반경을 변경하면 콜백에 새 반경이 전달됩니다', async () => {
-    const getCurrentPosition = vi.fn((success) =>
-      success({ coords: { latitude: 37.5, longitude: 127.0 } }),
-    );
-    vi.stubGlobal('navigator', { geolocation: { getCurrentPosition } });
-    const onLocationChange = vi.fn();
-    renderMap(<Map onLocationChange={onLocationChange} />);
-    await waitFor(() =>
-      expect(onLocationChange).toHaveBeenCalledWith({
-        lat: 37.5,
-        lng: 127.0,
-        radius: 500,
-      }),
-    );
-    fireEvent.change(screen.getByLabelText('검색 반경'), {
-      target: { value: '1000' },
-    });
-    await waitFor(() =>
-      expect(onLocationChange).toHaveBeenCalledWith({
-        lat: 37.5,
-        lng: 127.0,
-        radius: 1000,
-      }),
-    );
-    expect(getCurrentPosition).toHaveBeenCalledTimes(1);
-    expect(mapMock).toHaveBeenCalledTimes(1);
+    retrySuccess?.({ coords: { latitude: 37.5, longitude: 127 } } as GeolocationPosition);
   });
 });

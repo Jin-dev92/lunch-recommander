@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { useEffect, type ReactElement } from 'react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SavedPlace } from '../lib/types/api';
+import type { MapCanvasProps } from './map/types';
 
 // useSavedPlaces/useUpdateSavedPlaceMemo/useDeleteSavedPlace를 직접 모킹해 지도 SDK 로딩과
 // 데이터 로딩을 분리한다. 실제 supabase 호출은 각 훅 자체의 테스트가 이미 커버한다.
@@ -25,61 +26,29 @@ vi.mock('../lib/hooks/mutations', () => ({
   }),
 }));
 
-// next/script와 전역 kakao 객체 모킹은 components/Map.test.tsx와 동일한 방식을 따른다.
-let scriptShouldFail = false;
-vi.mock('next/script', () => ({
-  default: function MockScript({
-    onReady,
-    onError,
-  }: {
-    onReady?: () => void;
-    onError?: () => void;
-  }) {
-    useEffect(() => {
-      if (scriptShouldFail) onError?.();
-      else onReady?.();
-    }, [onReady, onError]);
-    return null;
+// 지도 SDK 연결은 캔버스 쪽 테스트(components/map/*.test.tsx)가 검증한다.
+// 여기서는 넘기는 마커·중심과 캔버스 콜백에 대한 반응만 본다.
+let canvasProps: MapCanvasProps | null = null;
+vi.mock('./map/MapCanvas', () => ({
+  default: function MockMapCanvas(props: MapCanvasProps) {
+    canvasProps = props;
+    return <div data-testid="map-canvas" aria-hidden={props.ariaHidden} />;
   },
 }));
 
 import SavedPlacesMap from './SavedPlacesMap';
-
-const mapMock = vi.fn();
-const markerMock = vi.fn();
-const setCenter = vi.fn();
-const setMap = vi.fn();
-function latLng(lat: number, lng: number) {
-  return { getLat: () => lat, getLng: () => lng };
-}
 
 function renderPlacesMap(ui: ReactElement) {
   return render(ui);
 }
 
 beforeEach(() => {
-  scriptShouldFail = false;
+  canvasProps = null;
   useSavedPlaces.mockReset();
   updateMemoMutate.mockReset();
   deleteMutate.mockReset();
   geocodeMutate.mockReset();
   addSavedPlaceMutate.mockReset();
-  mapMock.mockReset();
-  markerMock.mockReset();
-  setCenter.mockReset();
-  setMap.mockReset();
-  mapMock.mockImplementation(() => ({ setCenter, setLevel: vi.fn() }));
-  markerMock.mockImplementation(() => ({ setMap }));
-  (globalThis as unknown as { kakao: unknown }).kakao = {
-    maps: {
-      // autoload=false로 불러온 SDK는 이 콜백으로 초기화 완료를 알린다.
-      load: (callback: () => void) => callback(),
-      LatLng: vi.fn((lat: number, lng: number) => latLng(lat, lng)),
-      Map: mapMock,
-      Marker: markerMock,
-      event: { addListener: vi.fn() },
-    },
-  };
 });
 
 const places: SavedPlace[] = [
@@ -190,7 +159,11 @@ describe('저장 맛집 지도', () => {
     fireEvent.change(screen.getByLabelText('장소 검색'), { target: { value: '판교역' } });
     fireEvent.click(screen.getByRole('button', { name: '추가' }));
 
-    expect(geocodeMutate).toHaveBeenCalledWith('판교역', expect.anything());
+    // 현재 지도 중심을 함께 보내 서버가 국내/해외 지오코딩 provider를 고르게 한다.
+    expect(geocodeMutate).toHaveBeenCalledWith(
+      { address: '판교역', near: { lat: 37.5, lng: 127.0 } },
+      expect.anything(),
+    );
     expect(addSavedPlaceMutate).toHaveBeenCalledWith(
       {
         folderId: 'f1',
@@ -210,10 +183,36 @@ describe('저장 맛집 지도', () => {
     expect(screen.queryByLabelText('장소 검색')).not.toBeInTheDocument();
   });
 
-  it('지도 스크립트 로드에 실패하면 에러 메시지를 보여줍니다', () => {
-    scriptShouldFail = true;
+  it('지도 로드에 실패하면 에러 메시지를 보여줍니다', async () => {
     useSavedPlaces.mockReturnValue({ data: places, isLoading: false, isError: false });
     renderPlacesMap(<SavedPlacesMap folderId="f1" canEdit={true} />);
-    expect(screen.getByRole('alert')).toHaveTextContent('지도를 불러오지 못했습니다');
+
+    canvasProps!.onError!();
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('지도를 불러오지 못했습니다'),
+    );
+  });
+
+  it('저장 맛집을 마커로 넘기고 첫 항목을 지도 중심으로 삼습니다', () => {
+    useSavedPlaces.mockReturnValue({ data: places, isLoading: false, isError: false });
+    renderPlacesMap(<SavedPlacesMap folderId="f1" canEdit={true} />);
+
+    expect(canvasProps!.center).toEqual({ lat: 37.5, lng: 127.0 });
+    expect(canvasProps!.markers).toEqual([
+      expect.objectContaining({ id: 's1', lat: 37.5, lng: 127.0, title: '한식당' }),
+      expect.objectContaining({ id: 's2', lat: 37.6, lng: 127.1, title: '카페' }),
+    ]);
+    // 핀은 보조 시각화라 끌 수 없다(실제 상호작용은 목록이 담당한다).
+    expect(canvasProps!.markers.every((marker) => !marker.draggable)).toBe(true);
+  });
+
+  it('핀을 누르면 그 항목의 상세가 열립니다', async () => {
+    useSavedPlaces.mockReturnValue({ data: places, isLoading: false, isError: false });
+    renderPlacesMap(<SavedPlacesMap folderId="f1" canEdit={true} />);
+
+    canvasProps!.onMarkerClick!('s2');
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: '카페' })).toBeInTheDocument());
   });
 });

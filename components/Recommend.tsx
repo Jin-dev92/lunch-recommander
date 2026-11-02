@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useRecommendationData } from '../lib/hooks/queries';
+import { priceLevelSymbol } from '../lib/constants';
 
 import { errorMessage, MESSAGES } from '../lib/messages';
 import { mergeCandidates } from '../lib/mergeCandidates';
@@ -30,6 +31,7 @@ type Result = Candidate & {
   lat: number;
   lng: number;
   placeUrl: string;
+  priceLevel: string | null;
   weight: number;
 };
 
@@ -124,14 +126,23 @@ export default function Recommend({
           <div className={styles.resultHeader}>
             <h2 className={styles.name}>{result.name}</h2>
           </div>
+          {/* 평점·가격대는 해외(Google) 결과에만 있다. 국내(카카오) 결과에서는 빈 값이
+              되어 이 줄에서 자연히 빠지므로 지역별로 레이아웃이 갈리지 않는다. */}
           <p className={styles.meta}>
-            {[result.categoryLabel, `${Math.round(result.distanceMeters)}m`]
+            {[
+              result.categoryLabel,
+              result.googleRating == null
+                ? ''
+                : `★ ${result.googleRating.toFixed(1)} (${result.googleRatingsTotal})`,
+              priceLevelSymbol(result.priceLevel),
+              `${Math.round(result.distanceMeters)}m`,
+            ]
               .filter(Boolean)
               .join(' · ')}
           </p>
           {result.address && <p className={styles.address}>{result.address}</p>}
-          {/* 카카오 로컬 API에는 사진·평점·가격대가 없다. 메뉴·사진·리뷰는 nearby가 함께
-              돌려주는 카카오맵 장소 상세(place_url)로 넘긴다. 추가 API 호출이 없다. */}
+          {/* 사진은 어느 provider에서도 받지 않는다(Google 사진은 호출당 과금되는 별도 SKU다).
+              메뉴·사진·리뷰는 nearby가 함께 돌려주는 장소 상세(place_url)로 넘긴다. */}
           <a
             className={styles.detailLink}
             href={result.placeUrl}

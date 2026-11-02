@@ -131,27 +131,33 @@ npx supabase start
 
 ### 5. 환경변수 설정
 
-프로젝트 루트에 `.env.local`을 만들고 `.env.local.example`을 참고하여 다음 값을 채웁니다. 네 값 모두 브라우저에 노출되는 공개 값입니다.
+프로젝트 루트에 `.env.local`을 만들고 `.env.local.example`을 참고하여 다음 값을 채웁니다. 다섯 값 모두 브라우저에 노출되는 공개 값입니다.
 
 ```dotenv
 NEXT_PUBLIC_SUPABASE_URL=<Supabase API URL>
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<Supabase anon key>
 NEXT_PUBLIC_KAKAO_MAP_KEY=<Kakao JavaScript key>
+NEXT_PUBLIC_GOOGLE_MAPS_KEY=<Google Maps JavaScript API key>
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=<Cloudflare Turnstile site key>
 ```
 
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`는 브라우저 노출이 허용되는 키이며, 데이터 접근은 RLS 정책으로 보호합니다.
-- `NEXT_PUBLIC_KAKAO_MAP_KEY`는 지도 렌더링용 카카오 JavaScript 키입니다. 카카오 개발자 콘솔의 [앱 설정 > 플랫폼 > Web]에 사이트 도메인을 등록해야 하며, 등록된 도메인에서만 지도 SDK가 동작합니다. 장소 검색에 쓰는 REST API 키와는 다른 키입니다.
+- 지도는 좌표에 따라 제공자가 갈립니다. 국내 좌표에서는 카카오맵, 해외 좌표에서는 Google 지도를 씁니다. 판정 기준은 `lib/region.ts`의 좌표 사각형입니다.
+- `NEXT_PUBLIC_KAKAO_MAP_KEY`는 국내 지도 렌더링용 카카오 JavaScript 키입니다. 카카오 개발자 콘솔의 [앱 설정 > 플랫폼 > Web]에 사이트 도메인을 등록해야 하며, 등록된 도메인에서만 지도 SDK가 동작합니다. 장소 검색에 쓰는 REST API 키와는 다른 키입니다.
+- `NEXT_PUBLIC_GOOGLE_MAPS_KEY`는 해외 지도 렌더링용 키입니다. 허용된 도메인에서만 사용할 수 있도록 HTTP referrer 제한을 설정해야 합니다. **GCP 결제가 활성화되어 있지 않으면 Google Maps JavaScript API가 지도 렌더를 거부합니다.**
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY`는 위젯 렌더링용 공개 키입니다. Turnstile secret과 혼동하면 안 됩니다.
 
 민감한 키는 브라우저에 노출하지 않고 Supabase Dashboard나 Edge Function 시크릿처럼 서버 측 설정으로만 보관합니다.
 
-- `KAKAO_REST_API_KEY`: 카카오 로컬 API(주변 음식점 검색·주소 검색)를 호출하는 서버용 키입니다. 도메인 제한이 걸리지 않는 키이므로 `VITE_`, `NEXT_PUBLIC_`처럼 클라이언트에 노출되는 접두사를 사용해서는 안 됩니다.
+- `KAKAO_REST_API_KEY`: 국내 좌표에서 카카오 로컬 API(주변 음식점 검색·주소 검색)를 호출하는 서버용 키입니다.
+- `GOOGLE_PLACES_API_KEY`: 해외 좌표에서 Google Places·Geocoding API를 호출하는 서버용 키입니다.
+- 두 키 모두 도메인 제한이 걸리지 않으므로 `VITE_`, `NEXT_PUBLIC_`처럼 클라이언트에 노출되는 접두사를 사용해서는 안 됩니다.
 
 로컬에서 Edge Function 시크릿을 설정하려면 다음처럼 실행합니다.
 
 ```bash
 npx supabase secrets set KAKAO_REST_API_KEY=<...>
+npx supabase secrets set GOOGLE_PLACES_API_KEY=<...>
 ```
 
 AWS 또는 GCP 등 과금 가능한 클라우드 서비스를 사용할 때는 코드 외부에서 예산 알림(Budget Alert)과 할당량 상한을 설정해야 합니다.
@@ -211,18 +217,21 @@ npx supabase functions deploy nearby place-photo
 ### GCP 요금 방어 마무리
 
 - [ ] Vercel 프리뷰 배포 도메인이 필요하면 카카오 개발자 콘솔의 Web 플랫폼 사이트 도메인에 추가합니다. 현재는 배포 도메인과 localhost만 등록되어 있습니다.
-- [ ] 카카오 REST API 키에는 IP 제한을 두지 않았습니다. Supabase Edge Function은 고정 outbound IP가 없어 IP 제한이 비현실적이며, 시크릿 비노출 · 사용량 제한(사용자 ID + IP 이중 레이트리밋)으로 갈음합니다.
+- [ ] 카카오·Google 서버 키에는 IP 제한을 두지 않았습니다. Supabase Edge Function은 고정 outbound IP가 없어 IP 제한이 비현실적이며, 시크릿 비노출 · 사용량 제한(사용자 ID + IP 이중 레이트리밋)으로 갈음합니다.
+- [ ] **GCP 예산 알림(Budget Alert)과 API 할당량 상한을 반드시 설정해야 합니다.** 3개월 방치 중 결제 계정이 닫혀 지도가 렌더되지 않는 장애가 있었고, 해외 경로는 이 결제에 의존합니다.
 
 ### 후속 개선(병합 차단 아님)
 
 - [ ] 회원가입 인증 메일은 Supabase 내장 발송을 사용합니다. 발송량이 내장 한도를 넘으면 Supabase Auth에 별도 SMTP를 설정해야 하며 이때는 발신 도메인 인증이 필요합니다.
-- [ ] 카카오 로컬 API에는 장소 평점·리뷰 수·사진·가격대가 없어 추천은 사용자 자신의 별점·카테고리 선호·거리만으로 점수를 냅니다. 외부 평점을 다시 쓰려면 별도 데이터 소스가 필요합니다.
+- [ ] 카카오 로컬 API에는 장소 평점·리뷰 수·가격대가 없습니다. 따라서 국내 추천은 사용자 자신의 별점·카테고리 선호·거리만으로 점수를 내고, 해외(Google) 추천에만 평점 항이 더해집니다. 평점·가격대는 필터가 아니라 표시 정보로만 쓰므로 지역별로 UI가 갈리지 않습니다.
+- [ ] 사진은 어느 제공자에서도 받지 않습니다. Google 사진은 호출당 과금되는 별도 SKU(GetPhotoMedia)라 장소 상세 링크로 갈음합니다.
 - [ ] 서버 렌더링에서 민감 데이터를 다루게 되면 `@supabase/ssr`로 전환하여 서버에서 실제 세션과 JWT를 검증합니다. 현재 `sb-session` 마커 쿠키는 사용자 경험을 위한 가드이며 실제 데이터 보호는 RLS가 담당합니다.
 
 ## 설계 문서
 
 - 스펙: [`docs/superpowers/specs/2026-07-21-lunch-recommender-design.md`](docs/superpowers/specs/2026-07-21-lunch-recommender-design.md)
 - 카카오맵 전환 설계: [`docs/superpowers/specs/2026-11-02-kakao-map-migration-design.md`](docs/superpowers/specs/2026-11-02-kakao-map-migration-design.md)
+- 국내 카카오 / 해외 Google 듀얼 설계: [`docs/superpowers/specs/2026-11-03-dual-provider-map-design.md`](docs/superpowers/specs/2026-11-03-dual-provider-map-design.md)
 - 구현 계획: [`docs/superpowers/plans/2026-07-21-lunch-recommender.md`](docs/superpowers/plans/2026-07-21-lunch-recommender.md)
 - 이메일 인증 회원가입: [`docs/superpowers/specs/2026-07-25-email-verification-signup-design.md`](docs/superpowers/specs/2026-07-25-email-verification-signup-design.md)
 - 이메일 인증 회원가입 구현 계획: [`docs/superpowers/plans/2026-07-25-email-verification-signup.md`](docs/superpowers/plans/2026-07-25-email-verification-signup.md)

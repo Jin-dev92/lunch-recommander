@@ -35,6 +35,22 @@ export type FoodCategory = (typeof FOOD_CATEGORY)[keyof typeof FOOD_CATEGORY];
 export const FOOD_CATEGORY_OPTIONS = Object.values(FOOD_CATEGORY);
 
 /**
+ * Google priceLevel 열거형을 ₩ 기호로 환산한다. Google은 실제 메뉴 가격이 아니라 이 4단계
+ * 등급만 제공한다. 카카오 로컬 API에는 가격대가 없으므로 국내 결과는 항상 빈 문자열이 되고,
+ * 결과 카드의 메타 줄에서 자연히 빠진다.
+ */
+const PRICE_LEVEL_SYMBOLS: Record<string, string> = {
+  PRICE_LEVEL_INEXPENSIVE: '₩',
+  PRICE_LEVEL_MODERATE: '₩₩',
+  PRICE_LEVEL_EXPENSIVE: '₩₩₩',
+  PRICE_LEVEL_VERY_EXPENSIVE: '₩₩₩₩',
+};
+
+export function priceLevelSymbol(priceLevel: string | null): string {
+  return priceLevel ? (PRICE_LEVEL_SYMBOLS[priceLevel] ?? '') : '';
+}
+
+/**
  * 카카오맵 웹 검색 URL. 저장한 맛집에는 카카오 place_url이 없고(좌표로 직접 추가한
  * "manual:" 항목이 섞여 있어 장소 상세 페이지가 없는 행도 있다), 장소명 검색은 두 종류를
  * 같은 방식으로 처리할 수 있다. 추가 API 호출·비용이 없다.

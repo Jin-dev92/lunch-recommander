@@ -5,6 +5,9 @@ export type Candidate = {
   placeId: string;
   category: string;
   distanceMeters: number;
+  // 해외(Google) 결과에만 값이 있다. 카카오 로컬 API에는 평점이 없어 국내는 null·0이다.
+  googleRating: number | null;
+  googleRatingsTotal: number;
   personalRating: number | null;
   snoozedUntil: string | null;
 };
@@ -17,6 +20,7 @@ export type RecommendationPrefs = {
 const EXPONENTS = {
   category: 1,
   personal: 1,
+  google: 1,
   distance: 1,
 } as const;
 
@@ -37,15 +41,25 @@ export function filterCandidates<T extends Candidate>(
 }
 
 /**
- * 카카오 로컬 API에는 평점·리뷰 수가 없어 외부 평점 항이 없다. 사용자 자신의 취향 이력
- * (카테고리 선호·개인 별점)과 거리만으로 점수를 낸다. 세 항 모두 1이 중립이다.
+ * 네 항 모두 1이 중립이다. google 항은 해외(Google) 결과에만 값이 들어가고, 평점이 없는
+ * 국내(카카오) 결과는 1로 떨어져 **세 항 공식과 수학적으로 동일한 점수**가 나온다.
+ * 후보 풀은 한 좌표 기준으로 만들어지므로 평점 있는 후보와 없는 후보가 한 추첨에 섞이지 않는다.
  */
 export function scoreCandidate(candidate: Candidate, prefs: RecommendationPrefs): number {
   const category = prefs.categoryWeights[candidate.category] ?? 1;
   const personal = candidate.personalRating == null ? 1 : candidate.personalRating / 3;
+  // 주의: 이 항은 **감점 전용**이다. (rating/5 - 1)이 0 이하라서 결과가 1을 넘지 않는다.
+  // 평점 5.0이 중립(1)이고 그 아래가 깎인다. reviewConfidence는 리뷰가 적을수록 0에 가까워져
+  // 표본이 빈약한 가게의 낮은 평점을 덜 신뢰하게 만든다(감점 폭이 줄어든다).
+  const reviewConfidence = candidate.googleRatingsTotal / (candidate.googleRatingsTotal + 20);
+  const google =
+    candidate.googleRating == null ? 1 : 1 + (candidate.googleRating / 5 - 1) * reviewConfidence;
   const distance = 1 + 0.2 * Math.max(0, 1 - candidate.distanceMeters / prefs.maxDistanceMeters);
   return (
-    category ** EXPONENTS.category * personal ** EXPONENTS.personal * distance ** EXPONENTS.distance
+    category ** EXPONENTS.category *
+    personal ** EXPONENTS.personal *
+    google ** EXPONENTS.google *
+    distance ** EXPONENTS.distance
   );
 }
 
