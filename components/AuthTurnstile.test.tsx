@@ -54,6 +54,29 @@ describe('AuthTurnstile', () => {
     expect(onTokenChange).toHaveBeenNthCalledWith(2, '');
   });
 
+  it('오류는 onFail로 올리고 만료는 올리지 않습니다', () => {
+    // 만료는 위젯이 스스로 다시 푸는 정상 흐름이라 실패로 보고하면 안 된다.
+    process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = 'test-site-key';
+    const onFail = vi.fn();
+    render(<AuthTurnstile onTokenChange={vi.fn()} onFail={onFail} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'CAPTCHA 만료' }));
+    expect(onFail).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'CAPTCHA 오류' }));
+    expect(onFail).toHaveBeenCalledOnce();
+  });
+
+  it('onFail을 넘기지 않아도 오류 처리가 깨지지 않습니다', () => {
+    process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = 'test-site-key';
+    const onTokenChange = vi.fn();
+    render(<AuthTurnstile onTokenChange={onTokenChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'CAPTCHA 오류' }));
+
+    expect(onTokenChange).toHaveBeenCalledWith('');
+  });
+
   it('reset하면 위젯과 부모 토큰을 초기화합니다', () => {
     process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY = 'test-site-key';
     const onTokenChange = vi.fn();
