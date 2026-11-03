@@ -13,8 +13,7 @@ export function mergeCandidates(
     address: string | null;
     lat: number;
     lng: number;
-    priceLevel: string | null;
-    photoName: string | null;
+    placeUrl: string;
   })[];
   categoryWeights: Record<string, number>;
 } {

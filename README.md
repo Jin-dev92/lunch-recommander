@@ -27,7 +27,7 @@
 ### 추천
 
 - 현재 위치와 검색 반경(100m, 300m, 500m 또는 1km)을 기준으로 주변 음식점 한 곳을 추천합니다.
-- 최소 구글 평점(3.5~5.0)과 리뷰 수(10~100개)를 선택할 수 있으며 두 기준을 모두 만족하는 음식점만 추천 후보에 포함합니다. 기본값은 평점 3.5 이상, 리뷰 30개 이상입니다.
+- 최소 구글 평점(3.5~~5.0)과 리뷰 수(10~~100개)를 선택할 수 있으며 두 기준을 모두 만족하는 음식점만 추천 후보에 포함합니다. 기본값은 평점 3.5 이상, 리뷰 30개 이상입니다.
 - 내 평점과 그룹 구성원들의 평균 평점을 함께 반영하는 하이브리드 평점을 사용합니다.
 - 추천 카드에 음식점 이름, 카테고리, 가격대, 거리, 대표 사진을 한국어로 보여줍니다. 카테고리는 저장 키로 쓰는 기계값과 화면 표시용 한글 라벨을 분리해 다룹니다.
 - 가격대는 구글 priceLevel 등급을 ₩~₩₩₩₩ 기호로 환산해 보여줍니다. 구글은 실제 메뉴 가격이 아니라 4단계 등급만 제공합니다.
@@ -136,22 +136,22 @@ npx supabase start
 ```dotenv
 NEXT_PUBLIC_SUPABASE_URL=<Supabase API URL>
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<Supabase anon key>
-NEXT_PUBLIC_GOOGLE_MAPS_KEY=<Google Maps JavaScript API key>
+NEXT_PUBLIC_KAKAO_MAP_KEY=<Kakao JavaScript key>
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=<Cloudflare Turnstile site key>
 ```
 
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`는 브라우저 노출이 허용되는 키이며, 데이터 접근은 RLS 정책으로 보호합니다.
-- `NEXT_PUBLIC_GOOGLE_MAPS_KEY`는 지도 렌더링용 키입니다. 허용된 도메인에서만 사용할 수 있도록 HTTP referrer 제한을 설정해야 합니다.
+- `NEXT_PUBLIC_KAKAO_MAP_KEY`는 지도 렌더링용 카카오 JavaScript 키입니다. 카카오 개발자 콘솔의 [앱 설정 > 플랫폼 > Web]에 사이트 도메인을 등록해야 하며, 등록된 도메인에서만 지도 SDK가 동작합니다. 장소 검색에 쓰는 REST API 키와는 다른 키입니다.
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY`는 위젯 렌더링용 공개 키입니다. Turnstile secret과 혼동하면 안 됩니다.
 
 민감한 키는 브라우저에 노출하지 않고 Supabase Dashboard나 Edge Function 시크릿처럼 서버 측 설정으로만 보관합니다.
 
-- `GOOGLE_PLACES_API_KEY`: 서버용 Places 키. `VITE_`, `NEXT_PUBLIC_`처럼 클라이언트에 노출되는 접두사를 사용해서는 안 됩니다.
+- `KAKAO_REST_API_KEY`: 카카오 로컬 API(주변 음식점 검색·주소 검색)를 호출하는 서버용 키입니다. 도메인 제한이 걸리지 않는 키이므로 `VITE_`, `NEXT_PUBLIC_`처럼 클라이언트에 노출되는 접두사를 사용해서는 안 됩니다.
 
 로컬에서 Edge Function 시크릿을 설정하려면 다음처럼 실행합니다.
 
 ```bash
-npx supabase secrets set GOOGLE_PLACES_API_KEY=<...>
+npx supabase secrets set KAKAO_REST_API_KEY=<...>
 ```
 
 AWS 또는 GCP 등 과금 가능한 클라우드 서비스를 사용할 때는 코드 외부에서 예산 알림(Budget Alert)과 할당량 상한을 설정해야 합니다.
@@ -210,18 +210,19 @@ npx supabase functions deploy nearby place-photo
 
 ### GCP 요금 방어 마무리
 
-- [ ] Vercel 프리뷰 배포 도메인이 필요하면 Maps JS 브라우저 키 referrer에 추가합니다. 현재는 배포 도메인과 localhost만 허용되어 있습니다.
-- [ ] Places 서버 키의 IP 제한은 두지 않았습니다. Supabase Edge Function은 고정 outbound IP가 없어 IP 제한이 비현실적이며 API 제한(Places만) · 시크릿 비노출 · 사용량 제한 3중 방어로 갈음합니다.
+- [ ] Vercel 프리뷰 배포 도메인이 필요하면 카카오 개발자 콘솔의 Web 플랫폼 사이트 도메인에 추가합니다. 현재는 배포 도메인과 localhost만 등록되어 있습니다.
+- [ ] 카카오 REST API 키에는 IP 제한을 두지 않았습니다. Supabase Edge Function은 고정 outbound IP가 없어 IP 제한이 비현실적이며, 시크릿 비노출 · 사용량 제한(사용자 ID + IP 이중 레이트리밋)으로 갈음합니다.
 
 ### 후속 개선(병합 차단 아님)
 
 - [ ] 회원가입 인증 메일은 Supabase 내장 발송을 사용합니다. 발송량이 내장 한도를 넘으면 Supabase Auth에 별도 SMTP를 설정해야 하며 이때는 발신 도메인 인증이 필요합니다.
-- [ ] 지도 마커는 `google.maps.Marker`를 사용합니다. 후속 대체재인 `AdvancedMarkerElement`는 GCP 콘솔에서 발급하는 Map ID가 필요해 별도로 다룹니다.
+- [ ] 카카오 로컬 API에는 장소 평점·리뷰 수·사진·가격대가 없어 추천은 사용자 자신의 별점·카테고리 선호·거리만으로 점수를 냅니다. 외부 평점을 다시 쓰려면 별도 데이터 소스가 필요합니다.
 - [ ] 서버 렌더링에서 민감 데이터를 다루게 되면 `@supabase/ssr`로 전환하여 서버에서 실제 세션과 JWT를 검증합니다. 현재 `sb-session` 마커 쿠키는 사용자 경험을 위한 가드이며 실제 데이터 보호는 RLS가 담당합니다.
 
 ## 설계 문서
 
 - 스펙: [`docs/superpowers/specs/2026-07-21-lunch-recommender-design.md`](docs/superpowers/specs/2026-07-21-lunch-recommender-design.md)
+- 카카오맵 전환 설계: [`docs/superpowers/specs/2026-11-02-kakao-map-migration-design.md`](docs/superpowers/specs/2026-11-02-kakao-map-migration-design.md)
 - 구현 계획: [`docs/superpowers/plans/2026-07-21-lunch-recommender.md`](docs/superpowers/plans/2026-07-21-lunch-recommender.md)
 - 이메일 인증 회원가입: [`docs/superpowers/specs/2026-07-25-email-verification-signup-design.md`](docs/superpowers/specs/2026-07-25-email-verification-signup-design.md)
 - 이메일 인증 회원가입 구현 계획: [`docs/superpowers/plans/2026-07-25-email-verification-signup.md`](docs/superpowers/plans/2026-07-25-email-verification-signup.md)

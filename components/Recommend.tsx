@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { usePlacePhoto, useRecommendationData } from '../lib/hooks/queries';
-import { displayAddress, googleMapsPlaceUrl, priceLevelSymbol } from '../lib/constants';
+import { useRecommendationData } from '../lib/hooks/queries';
+
 import { errorMessage, MESSAGES } from '../lib/messages';
 import { mergeCandidates } from '../lib/mergeCandidates';
 import {
@@ -29,8 +29,7 @@ type Result = Candidate & {
   address: string | null;
   lat: number;
   lng: number;
-  priceLevel: string | null;
-  photoName: string | null;
+  placeUrl: string;
   weight: number;
 };
 
@@ -58,8 +57,6 @@ export default function Recommend({
   const [recommendationPool, setRecommendationPool] = useState<RecommendationPool | null>(null);
   const seenPlaceIds = useRef(new Set<string>());
   const { refetch, isFetching } = useRecommendationData(location);
-  // 사진은 추천된 곳에 photoName이 있을 때만 조회된다(hook 안에서 enabled로 제어).
-  const photo = usePlacePhoto(result?.photoName ?? null);
 
   useEffect(() => {
     setRecommendationPool(null);
@@ -67,13 +64,7 @@ export default function Recommend({
     setResult(null);
     setError('');
     setPoolExhausted(false);
-  }, [
-    location?.lat,
-    location?.lng,
-    location?.radius,
-    criteria.minGoogleRating,
-    criteria.minGoogleReviews,
-  ]);
+  }, [location?.lat, location?.lng, location?.radius, criteria.category]);
 
   async function run() {
     if (!location) return;
@@ -131,37 +122,23 @@ export default function Recommend({
       {result && (
         <article className={styles.result}>
           <div className={styles.resultHeader}>
-            {/* 가게 외형은 이름 텍스트에 없는 정보라 의미 있는 alt를 준다. */}
-            {photo.data && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                className={styles.thumbnail}
-                src={photo.data}
-                alt={`${result.name} 사진`}
-                width={72}
-                height={72}
-              />
-            )}
             <h2 className={styles.name}>{result.name}</h2>
           </div>
           <p className={styles.meta}>
-            {[
-              result.categoryLabel,
-              priceLevelSymbol(result.priceLevel),
-              `${Math.round(result.distanceMeters)}m`,
-            ]
+            {[result.categoryLabel, `${Math.round(result.distanceMeters)}m`]
               .filter(Boolean)
               .join(' · ')}
           </p>
-          {result.address && <p className={styles.address}>{displayAddress(result.address)}</p>}
-          {/* 메뉴·사진·리뷰는 Google 지도 상세로 넘긴다. placeId만 쓰므로 추가 API 비용이 없다. */}
+          {result.address && <p className={styles.address}>{result.address}</p>}
+          {/* 카카오 로컬 API에는 사진·평점·가격대가 없다. 메뉴·사진·리뷰는 nearby가 함께
+              돌려주는 카카오맵 장소 상세(place_url)로 넘긴다. 추가 API 호출이 없다. */}
           <a
             className={styles.detailLink}
-            href={googleMapsPlaceUrl(result.name, result.placeId)}
+            href={result.placeUrl}
             target="_blank"
             rel="noopener noreferrer"
           >
-            {MESSAGES.GOOGLE_MAPS_DETAIL_LINK}
+            {MESSAGES.KAKAO_MAP_DETAIL_LINK}
           </a>
           {canRate ? (
             <>

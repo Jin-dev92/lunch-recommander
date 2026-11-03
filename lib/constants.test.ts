@@ -1,30 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { displayAddress } from './constants';
+import { FOOD_CATEGORY, FOOD_CATEGORY_OPTIONS, kakaoMapSearchUrl } from './constants';
 
-describe('displayAddress', () => {
-  it('한국 주소는 맨 앞 국가명("대한민국")을 뗍니다', () => {
-    expect(displayAddress('대한민국 서울특별시 성북구 동소문로 20길 37')).toBe(
-      '서울특별시 성북구 동소문로 20길 37',
+describe('kakaoMapSearchUrl', () => {
+  it('장소명을 카카오맵 검색 URL로 만듭니다', () => {
+    expect(kakaoMapSearchUrl('판교역')).toBe(
+      'https://map.kakao.com/?q=%ED%8C%90%EA%B5%90%EC%97%AD',
     );
   });
 
-  it('일본 주소도 맨 앞 국가명을 뗍니다', () => {
-    expect(displayAddress('日本 東京都 渋谷区')).toBe('東京都 渋谷区');
-  });
-
-  it('쉼표가 있는 서구식 주소는 국가가 맨 뒤라 그대로 둡니다', () => {
-    expect(displayAddress('123 Main St, Springfield, IL 62704, USA')).toBe(
-      '123 Main St, Springfield, IL 62704, USA',
+  it('공백과 & 같은 문자를 인코딩해 쿼리를 깨뜨리지 않습니다', () => {
+    expect(kakaoMapSearchUrl('김밥 & 라면')).toBe(
+      'https://map.kakao.com/?q=%EA%B9%80%EB%B0%A5%20%26%20%EB%9D%BC%EB%A9%B4',
     );
   });
+});
 
-  it('국가명이 없으면(짧은 첫 어절 아님) 그대로 둡니다', () => {
-    // 첫 어절이 5자를 넘으면 국가명으로 보지 않는다.
-    expect(displayAddress('서울특별시 성북구 동소문로')).toBe('서울특별시 성북구 동소문로');
+describe('FOOD_CATEGORY_OPTIONS', () => {
+  it('기본값 전체를 첫 항목으로 노출합니다', () => {
+    expect(FOOD_CATEGORY_OPTIONS[0]).toBe(FOOD_CATEGORY.ALL);
   });
 
-  it('null·빈 값은 빈 문자열로 처리합니다', () => {
-    expect(displayAddress(null)).toBe('');
-    expect(displayAddress('   ')).toBe('');
+  it('중복 없이 모든 카테고리를 담습니다', () => {
+    expect(new Set(FOOD_CATEGORY_OPTIONS).size).toBe(FOOD_CATEGORY_OPTIONS.length);
   });
 });

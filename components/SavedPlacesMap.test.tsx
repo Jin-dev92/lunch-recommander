@@ -25,7 +25,7 @@ vi.mock('../lib/hooks/mutations', () => ({
   }),
 }));
 
-// next/script와 전역 google 객체 모킹은 components/Map.test.tsx와 동일한 방식을 따른다.
+// next/script와 전역 kakao 객체 모킹은 components/Map.test.tsx와 동일한 방식을 따른다.
 let scriptShouldFail = false;
 vi.mock('next/script', () => ({
   default: function MockScript({
@@ -49,6 +49,9 @@ const mapMock = vi.fn();
 const markerMock = vi.fn();
 const setCenter = vi.fn();
 const setMap = vi.fn();
+function latLng(lat: number, lng: number) {
+  return { getLat: () => lat, getLng: () => lng };
+}
 
 function renderPlacesMap(ui: ReactElement) {
   return render(ui);
@@ -65,17 +68,18 @@ beforeEach(() => {
   markerMock.mockReset();
   setCenter.mockReset();
   setMap.mockReset();
-  mapMock.mockImplementation(() => ({ setCenter }));
-  markerMock.mockImplementation(() => ({ addListener: vi.fn(), setMap }));
-  (globalThis as unknown as { google: typeof google }).google = {
+  mapMock.mockImplementation(() => ({ setCenter, setLevel: vi.fn() }));
+  markerMock.mockImplementation(() => ({ setMap }));
+  (globalThis as unknown as { kakao: unknown }).kakao = {
     maps: {
-      importLibrary: vi.fn(async (name: string) => {
-        if (name === 'maps') return { Map: mapMock };
-        if (name === 'marker') return { Marker: markerMock };
-        throw new Error(`요청하지 않은 라이브러리: ${name}`);
-      }),
+      // autoload=false로 불러온 SDK는 이 콜백으로 초기화 완료를 알린다.
+      load: (callback: () => void) => callback(),
+      LatLng: vi.fn((lat: number, lng: number) => latLng(lat, lng)),
+      Map: mapMock,
+      Marker: markerMock,
+      event: { addListener: vi.fn() },
     },
-  } as unknown as typeof google;
+  };
 });
 
 const places: SavedPlace[] = [
@@ -86,7 +90,7 @@ const places: SavedPlace[] = [
     name: '한식당',
     lat: 37.5,
     lng: 127.0,
-    address: '대한민국 서울특별시 성북구',
+    address: '서울 성북구 동소문로 20길 37',
     memo: '점심 맛집',
     createdAt: 't',
   },
@@ -118,11 +122,11 @@ describe('저장 맛집 지도', () => {
     fireEvent.click(screen.getByRole('button', { name: '한식당' }));
 
     expect(screen.getByRole('heading', { name: '한식당' })).toBeInTheDocument();
-    expect(screen.getByText('서울특별시 성북구')).toBeInTheDocument();
+    expect(screen.getByText('서울 성북구 동소문로 20길 37')).toBeInTheDocument();
     expect(screen.getByText('점심 맛집')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '메뉴·리뷰 자세히 보기' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '메뉴·사진·리뷰 자세히 보기' })).toHaveAttribute(
       'href',
-      expect.stringContaining('query_place_id=p1'),
+      'https://map.kakao.com/?q=%ED%95%9C%EC%8B%9D%EB%8B%B9',
     );
   });
 
