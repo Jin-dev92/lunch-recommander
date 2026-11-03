@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FOOD_CATEGORY, FOOD_CATEGORY_OPTIONS, kakaoMapSearchUrl } from './constants';
+import { ALL_CATEGORIES, kakaoMapSearchUrl } from './constants';
 
 describe('kakaoMapSearchUrl', () => {
   it('장소명을 카카오맵 검색 URL로 만듭니다', () => {
@@ -15,12 +15,9 @@ describe('kakaoMapSearchUrl', () => {
   });
 });
 
-describe('FOOD_CATEGORY_OPTIONS', () => {
-  it('기본값 전체를 첫 항목으로 노출합니다', () => {
-    expect(FOOD_CATEGORY_OPTIONS[0]).toBe(FOOD_CATEGORY.ALL);
-  });
-
-  it('중복 없이 모든 카테고리를 담습니다', () => {
-    expect(new Set(FOOD_CATEGORY_OPTIONS).size).toBe(FOOD_CATEGORY_OPTIONS.length);
+describe('ALL_CATEGORIES', () => {
+  it('"좁히지 않음" 센티넬로 쓸 문구를 제공합니다', () => {
+    // 나머지 선택지는 검색 결과에서 나오므로 상수는 이 하나뿐이다.
+    expect(ALL_CATEGORIES).toBe('전체');
   });
 });

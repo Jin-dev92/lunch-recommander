@@ -8,16 +8,11 @@ import { ROUTES } from '../lib/constants';
 import { useAuth } from '../lib/hooks/useAuth';
 import { useSignOut } from '../lib/hooks/mutations';
 import { errorMessage, MESSAGES } from '../lib/messages';
-import {
-  DEFAULT_RECOMMENDATION_CRITERIA,
-  type RecommendationCriteria,
-  type SearchLocation,
-} from '../lib/types/api';
+import { type SearchLocation } from '../lib/types/api';
 import styles from './page.module.css';
 
 export default function HomePage() {
   const [searchLocation, setSearchLocation] = useState<SearchLocation | null>(null);
-  const [criteria, setCriteria] = useState<RecommendationCriteria>(DEFAULT_RECOMMENDATION_CRITERIA);
   const { isLoggedIn } = useAuth();
   const signOut = useSignOut();
 
@@ -61,13 +56,13 @@ export default function HomePage() {
           {errorMessage(signOut.error)}
         </p>
       )}
-      <Map onLocationChange={setSearchLocation} onCriteriaChange={setCriteria} />
+      <Map onLocationChange={setSearchLocation} />
       {searchLocation && (
         <p className={styles.location}>
           선택된 위치: {searchLocation.lat}, {searchLocation.lng} ({searchLocation.radius}m)
         </p>
       )}
-      <Recommend location={searchLocation} criteria={criteria} canRate={isLoggedIn} />
+      <Recommend location={searchLocation} canRate={isLoggedIn} />
     </main>
   );
 }

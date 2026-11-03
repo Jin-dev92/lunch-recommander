@@ -5,12 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
-import {
-  DEFAULT_RECOMMENDATION_CRITERIA,
-  type RecommendationCriteria,
-  type SearchLocation,
-} from '../lib/types/api';
-import { FOOD_CATEGORY_OPTIONS, type FoodCategory } from '../lib/constants';
+import { type SearchLocation } from '../lib/types/api';
 import { MESSAGES } from '../lib/messages';
 import { useGeocode } from '../lib/hooks/mutations';
 import { errorMessage } from '../lib/messages';
@@ -31,11 +26,9 @@ const DEFAULT_MAP_CENTER: Coords = { lat: 37.5665, lng: 126.978 };
 
 export default function Map({
   onLocationChange,
-  onCriteriaChange,
   onRefresh,
 }: {
   onLocationChange: (value: SearchLocation) => void;
-  onCriteriaChange?: (value: RecommendationCriteria) => void;
   onRefresh?: () => void;
 }) {
   const node = useRef<HTMLDivElement>(null);
@@ -46,7 +39,6 @@ export default function Map({
   const mapsRef = useRef<KakaoMaps | null>(null);
   const [sdkReady, setSdkReady] = useState(false);
   const [radius, setRadius] = useState<SearchLocation['radius']>(500);
-  const [category, setCategory] = useState<FoodCategory>(DEFAULT_RECOMMENDATION_CRITERIA.category);
   const [coords, setCoords] = useState<Coords | null>(null);
   const [error, setError] = useState('');
   const [isLocating, setIsLocating] = useState(false);
@@ -210,24 +202,6 @@ export default function Map({
             <option value="300">300m</option>
             <option value="500">500m</option>
             <option value="1000">1km</option>
-          </select>
-        </label>
-        <label className={styles.searchField}>
-          음식 종류
-          <select
-            className={styles.select}
-            value={category}
-            onChange={(e) => {
-              const value = e.target.value as FoodCategory;
-              setCategory(value);
-              onCriteriaChange?.({ category: value });
-            }}
-          >
-            {FOOD_CATEGORY_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
           </select>
         </label>
       </div>

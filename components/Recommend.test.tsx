@@ -243,22 +243,68 @@ describe('추천 실행', () => {
     );
   });
 
-  it('선택한 음식 종류에 해당하는 후보만 추천합니다', async () => {
-    post.mockResolvedValue(
-      mockNearby([
-        { ...restaurant, placeId: 'chinese', name: '중식당', category: '중식' },
-        { ...restaurant, placeId: 'japanese', name: '일식당', category: '일식' },
-        { ...restaurant, placeId: 'qualified', name: '한식당', category: '한식' },
-      ]),
-    );
+  function mixedPool() {
+    return mockNearby([
+      { ...restaurant, placeId: 'k1', name: '한식당', category: '한식' },
+      { ...restaurant, placeId: 'k2', name: '고깃집', category: '한식' },
+      { ...restaurant, placeId: 'b1', name: '빵집', category: '제과,베이커리' },
+    ]);
+  }
+
+  it('첫 추천 전에는 음식 종류 선택지를 보여주지 않습니다', async () => {
+    // 선택지는 받아온 후보에서 나오므로 그 전에는 고를 것이 없다.
+    post.mockResolvedValue(mixedPool());
     mockTables();
-    renderWithQuery(<Recommend location={location} criteria={{ category: '한식' }} canRate />);
+    renderWithQuery(<Recommend location={location} canRate />);
+
+    expect(screen.queryByLabelText('음식 종류')).not.toBeInTheDocument();
+  });
+
+  it('추천 후에는 실제 결과에 있는 종류만 개수와 함께 보여줍니다', async () => {
+    post.mockResolvedValue(mixedPool());
+    mockTables();
+    renderWithQuery(<Recommend location={location} canRate />);
 
     fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
 
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { name: '한식당' })).toBeInTheDocument(),
-    );
+    expect(await screen.findByLabelText('음식 종류')).toHaveValue('전체');
+    expect(screen.getByRole('option', { name: '전체 (3)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '한식 (2)' })).toBeInTheDocument();
+    // 하드코딩 목록에 없던 카테고리도 실제로 있으면 고를 수 있어야 한다.
+    expect(screen.getByRole('option', { name: '제과,베이커리 (1)' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /중식/ })).not.toBeInTheDocument();
+  });
+
+  it('음식 종류를 좁히면 그 종류에서만 추천하고 후보를 다시 받지 않습니다', async () => {
+    post.mockResolvedValue(mixedPool());
+    mockTables();
+    renderWithQuery(<Recommend location={location} canRate />);
+    fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
+    await screen.findByLabelText('음식 종류');
+    expect(post).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(screen.getByLabelText('음식 종류'), {
+      target: { value: '제과,베이커리' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: '빵집' })).toBeInTheDocument());
+    // 종류만 바꿨을 뿐이라 외부 API 호출과 레이트리밋을 다시 쓰지 않는다.
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
+  it('종류를 좁히면 이미 본 곳 기록을 비워 그 안에서 다시 뽑습니다', async () => {
+    post.mockResolvedValue(mixedPool());
+    mockTables();
+    renderWithQuery(<Recommend location={location} canRate />);
+    fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
+    await screen.findByLabelText('음식 종류');
+
+    fireEvent.change(screen.getByLabelText('음식 종류'), { target: { value: '한식' } });
+    fireEvent.click(screen.getByRole('button', { name: '한 곳 추천' }));
+
+    await waitFor(() => expect(screen.getByRole('article')).toBeInTheDocument());
+    expect(screen.queryByText('이번 검색에서 추천할 음식점을 모두 확인했어요.')).toBeNull();
   });
 
   it('개인 평점이 0점인 음식점은 추천에서 제외됩니다', async () => {
