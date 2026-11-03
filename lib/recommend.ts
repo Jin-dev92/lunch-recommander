@@ -1,5 +1,4 @@
-import { FOOD_CATEGORY } from './constants';
-import type { RecommendationCriteria } from './types/api';
+import { ALL_CATEGORIES } from './constants';
 
 export type Candidate = {
   placeId: string;
@@ -20,20 +19,37 @@ const EXPONENTS = {
   distance: 1,
 } as const;
 
-// 제네릭이라 name 등 확장 필드를 붙인 후보를 넣어도 타입이 그대로 보존된다(호출부 캐스트 불필요).
-export function filterCandidates<T extends Candidate>(
-  candidates: T[],
-  now: Date,
-  criteria: RecommendationCriteria,
-): T[] {
+/**
+ * 추천 대상이 될 수 없는 후보를 걸러낸다(영구 제외·스누즈 중).
+ * 음식 종류 좁히기는 여기서 하지 않는다 — 그건 사용자가 바꿀 때마다 달라지는 조건이고,
+ * 이 결과는 위치가 바뀔 때만 다시 만들면 되기 때문이다. 둘을 섞으면 종류를 바꿀 때마다
+ * 후보를 다시 받아와야 한다(외부 API 호출과 레이트리밋을 그만큼 더 쓴다).
+ * 제네릭이라 name 등 확장 필드를 붙인 후보를 넣어도 타입이 그대로 보존된다.
+ */
+export function filterCandidates<T extends Candidate>(candidates: T[], now: Date): T[] {
   return candidates.filter(
-    (c) =>
-      c.personalRating !== 0 &&
-      (!c.snoozedUntil || new Date(c.snoozedUntil) <= now) &&
-      // ALL은 음식 종류를 좁히지 않는다. 카카오 2단계 카테고리는 열린 집합이라
-      // 상수 목록에 없는 값도 들어오며, 기본값 ALL에서는 그런 후보도 남는다.
-      (criteria.category === FOOD_CATEGORY.ALL || c.category === criteria.category),
+    (c) => c.personalRating !== 0 && (!c.snoozedUntil || new Date(c.snoozedUntil) <= now),
   );
+}
+
+/** 음식 종류로 좁힌다. ALL_CATEGORIES면 좁히지 않는다. */
+export function byCategory<T extends Candidate>(candidates: T[], category: string): T[] {
+  return category === ALL_CATEGORIES
+    ? candidates
+    : candidates.filter((c) => c.category === category);
+}
+
+/**
+ * 후보에 실제로 존재하는 음식 종류와 개수. 많은 순으로 정렬하고, 같으면 이름순으로 둬
+ * 추천을 다시 돌려도 선택지 순서가 흔들리지 않게 한다.
+ */
+export function categoryCounts(candidates: Candidate[]): { category: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const candidate of candidates)
+    counts.set(candidate.category, (counts.get(candidate.category) ?? 0) + 1);
+  return [...counts]
+    .map(([category, count]) => ({ category, count }))
+    .sort((a, b) => b.count - a.count || a.category.localeCompare(b.category));
 }
 
 /**

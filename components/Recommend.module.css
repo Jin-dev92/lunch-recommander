@@ -174,3 +174,35 @@
     transition: none;
   }
 }
+
+/* 음식 종류 좁히기. 선택지가 검색 결과에서 나오므로 추천 버튼 아래, 결과 옆에 둔다. */
+.categoryField {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.categorySelect {
+  min-width: 140px;
+  min-height: 44px;
+  padding: 0 34px 0 12px;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+}
+
+.categorySelect:hover {
+  border-color: #bdbdbd;
+}
+
+.categorySelect:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(232, 97, 58, 0.2);
+}

@@ -1,19 +1,9 @@
 // @see Edge Function 스펙: POST /functions/v1/nearby (supabase/functions/nearby/index.ts)
-import { FOOD_CATEGORY, type FoodCategory } from '../../constants';
 import type { CategoryPrefRow } from './categoryPrefs.types';
 import type { RatingRow } from './ratings.types';
 
 /** 지도에서 고른 검색 위치. 반경은 Edge Function이 허용하는 네 값만 받는다. */
 export type SearchLocation = { lat: number; lng: number; radius: 100 | 300 | 500 | 1000 };
-
-/**
- * 추천 후보를 좁히는 조건. 카카오 로컬 API에는 평점·리뷰 수가 없어 음식 종류로만 좁힌다.
- * 개인 별점은 필터가 아니라 scoreCandidate의 점수 항으로 반영된다.
- */
-export type RecommendationCriteria = { category: FoodCategory };
-export const DEFAULT_RECOMMENDATION_CRITERIA: RecommendationCriteria = {
-  category: FOOD_CATEGORY.ALL,
-};
 
 export type NearbyRestaurant = {
   /** 카카오 장소 식별자(로컬 API의 documents[].id). */

@@ -13,26 +13,12 @@ export const API_ROUTES = {
 } as const;
 
 /**
- * 음식 종류 필터. 카카오 로컬 API의 category_name("음식점 > 한식 > 육류,고기")에서 2단계 값과
- * 맞춰 쓴다. 카카오 2단계 카테고리는 열린 집합이라 여기 없는 값도 들어올 수 있으므로,
- * 기본값 ALL일 때는 필터를 적용하지 않아 누락이 생기지 않게 한다.
+ * 음식 종류 필터에서 "좁히지 않음"을 뜻하는 센티넬. 나머지 선택지는 고정 목록이 아니라
+ * 실제 검색 결과의 카테고리에서 뽑는다 — 카카오 2단계 카테고리는 열린 집합이라
+ * (한식·중식 외에 제과,베이커리·구내식당 등이 수시로 나온다) 목록을 박아두면
+ * 어떻게 채워도 새 값이 새고, 그 값을 가진 가게는 영영 고를 수 없게 된다.
  */
-export const FOOD_CATEGORY = {
-  ALL: '전체',
-  KOREAN: '한식',
-  CHINESE: '중식',
-  JAPANESE: '일식',
-  WESTERN: '양식',
-  SNACK: '분식',
-  CHICKEN: '치킨',
-  FAST_FOOD: '패스트푸드',
-  ASIAN: '아시아음식',
-  BAR: '술집',
-} as const;
-
-export type FoodCategory = (typeof FOOD_CATEGORY)[keyof typeof FOOD_CATEGORY];
-
-export const FOOD_CATEGORY_OPTIONS = Object.values(FOOD_CATEGORY);
+export const ALL_CATEGORIES = '전체';
 
 /**
  * 카카오맵 웹 검색 URL. 저장한 맛집에는 카카오 place_url이 없고(좌표로 직접 추가한

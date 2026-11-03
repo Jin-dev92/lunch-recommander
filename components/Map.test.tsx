@@ -196,36 +196,19 @@ describe('지도', () => {
     await waitFor(() => expect(mapMock).toHaveBeenCalledTimes(1));
   });
 
-  it('검색 반경과 음식 종류 조건을 제공합니다', () => {
+  it('검색 반경만 제공하고 음식 종류는 다루지 않습니다', () => {
+    // 음식 종류 선택지는 실제 검색 결과에서 나오므로 Recommend가 소유한다.
     vi.stubGlobal('navigator', {
       geolocation: { getCurrentPosition: vi.fn() },
     });
-    renderMap(<Map onLocationChange={vi.fn()} onCriteriaChange={vi.fn()} />);
+    renderMap(<Map onLocationChange={vi.fn()} />);
     expect(screen.getByRole('option', { name: '100m' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '300m' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '500m' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '1km' })).toBeInTheDocument();
-    // 카카오 로컬 API에는 평점·리뷰 수가 없어 음식 종류로만 후보를 좁힌다.
-    expect(screen.getByLabelText('음식 종류')).toHaveValue('전체');
-    expect(screen.getByRole('option', { name: '한식' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: '술집' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('음식 종류')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('최소 평점')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('최소 리뷰 수')).not.toBeInTheDocument();
     expect(screen.getByLabelText('주변 지도')).not.toHaveAttribute('style');
-  });
-
-  it('음식 종류를 변경하면 콜백에 새 조건을 전달합니다', () => {
-    vi.stubGlobal('navigator', {
-      geolocation: { getCurrentPosition: vi.fn() },
-    });
-    const onCriteriaChange = vi.fn();
-    renderMap(<Map onLocationChange={vi.fn()} onCriteriaChange={onCriteriaChange} />);
-
-    fireEvent.change(screen.getByLabelText('음식 종류'), { target: { value: '한식' } });
-    expect(onCriteriaChange).toHaveBeenLastCalledWith({ category: '한식' });
-
-    fireEvent.change(screen.getByLabelText('음식 종류'), { target: { value: '전체' } });
-    expect(onCriteriaChange).toHaveBeenLastCalledWith({ category: '전체' });
   });
 
   it('현재 위치를 얻으면 콜백과 지도를 초기화합니다', async () => {

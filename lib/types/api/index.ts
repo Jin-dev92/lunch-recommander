@@ -4,4 +4,3 @@ export type * from './folders.types';
 export type * from './ratings.types';
 export type * from './recommend.types';
 export type * from './savedPlaces.types';
-export { DEFAULT_RECOMMENDATION_CRITERIA } from './recommend.types';
