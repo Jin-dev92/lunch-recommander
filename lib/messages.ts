@@ -27,6 +27,8 @@ export const MESSAGES = {
   GEOLOCATION_DENIED: '현재 위치 권한이 필요합니다.',
   GEOLOCATION_SETTINGS_REQUIRED: '브라우저 설정에서 위치 권한을 허용해 주세요.',
   MAP_LOAD_FAILED: '지도를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.',
+  CAPTCHA_FAILED: '보안 확인에 실패했습니다. 다시 시도해 주세요.',
+  CAPTCHA_TIMEOUT: '보안 확인이 끝나지 않았습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.',
   MAP_ADJUST_HINT: '위치가 실제와 다르면 지도를 누르거나 핀을 끌어 옮기세요.',
   ADDRESS_SEARCH_PLACEHOLDER: '주소·장소로 검색 (예: 판교역)',
   KAKAO_MAP_DETAIL_LINK: '메뉴·사진·리뷰 자세히 보기',

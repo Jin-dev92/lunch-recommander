@@ -1,5 +1,5 @@
 import { forwardRef, useImperativeHandle } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -28,10 +28,15 @@ vi.mock('../lib/supabaseClient', () => ({
 }));
 
 vi.mock('./AuthTurnstile', () => ({
-  default: forwardRef<{ reset(): void }, { onTokenChange(token: string): void }>(
-    function AuthTurnstileDouble({ onTokenChange }, ref) {
+  default: forwardRef<{ reset(): void }, { onTokenChange(token: string): void; onFail?(): void }>(
+    function AuthTurnstileDouble({ onTokenChange, onFail }, ref) {
       useImperativeHandle(ref, () => ({ reset: mocks.reset }));
-      return <button onClick={() => onTokenChange('captcha-token')}>CAPTCHA 확인</button>;
+      return (
+        <>
+          <button onClick={() => onTokenChange('captcha-token')}>CAPTCHA 확인</button>
+          <button onClick={() => onFail?.()}>CAPTCHA 실패</button>
+        </>
+      );
     },
   ),
 }));
@@ -128,6 +133,67 @@ describe('AnonymousSessionGate', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('세션 생성 실패');
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+    expect(mocks.reset).toHaveBeenCalledOnce();
+  });
+
+  it('CAPTCHA 위젯이 오류를 보고하면 실패를 알리고 스피너를 감춥니다', async () => {
+    // 토큰만 비우고 아무것도 알리지 않으면 화면이 영영 로딩 상태로 남는다.
+    mocks.getCurrentUser.mockResolvedValue(null);
+
+    render(
+      <AnonymousSessionGate>
+        <p>추천 화면</p>
+      </AnonymousSessionGate>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'CAPTCHA 실패' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('보안 확인에 실패했습니다');
+    expect(screen.queryByText('보안 확인 중…')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+  });
+
+  it('CAPTCHA가 토큰도 오류도 주지 않으면 타임아웃으로 실패를 알립니다', async () => {
+    // 사이트 키가 현재 도메인을 허용하지 않으면 위젯이 렌더되지 않고 콜백도 오지 않는다.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mocks.getCurrentUser.mockResolvedValue(null);
+
+      render(
+        <AnonymousSessionGate>
+          <p>추천 화면</p>
+        </AnonymousSessionGate>,
+      );
+      await screen.findByRole('button', { name: 'CAPTCHA 확인' });
+      expect(screen.getByText('보안 확인 중…')).toBeInTheDocument();
+
+      await act(async () => {
+        vi.advanceTimersByTime(15000);
+      });
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('보안 확인이 끝나지 않았습니다');
+      expect(screen.queryByText('보안 확인 중…')).not.toBeInTheDocument();
+      expect(mocks.ensureSession).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('다시 시도를 누르면 오류를 지우고 확인 상태로 돌아갑니다', async () => {
+    mocks.getCurrentUser.mockResolvedValue(null);
+
+    render(
+      <AnonymousSessionGate>
+        <p>추천 화면</p>
+      </AnonymousSessionGate>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'CAPTCHA 실패' }));
+    await screen.findByRole('alert');
+
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText('보안 확인 중…')).toBeInTheDocument();
     expect(mocks.reset).toHaveBeenCalledOnce();
   });
 
